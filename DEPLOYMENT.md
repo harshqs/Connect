@@ -1,4 +1,4 @@
-﻿# Run Connect with real collaboration
+# Run Connect with real collaboration
 
 Connect needs three long-running pieces: a Next.js frontend, the Express/WebSocket server, and PostgreSQL. SQLite is not suitable for a public deployment because each hosted instance has isolated, ephemeral disk.
 
