@@ -154,13 +154,13 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
                 currentUser.name ? currentUser.name.charAt(0).toUpperCase() : "?"
               )}
             </div>
-            {/* Tooltip */}
-            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+            {/* Tooltip — below */}
+            <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+              <div className="mx-auto mb-0.5 w-2 h-1 overflow-hidden flex justify-center">
+                <div className="w-2 h-2 rotate-45 translate-y-1" style={{ backgroundColor: currentUser.color || "#2b7c6a" }} />
+              </div>
               <div className="whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold text-white shadow-lg" style={{ backgroundColor: currentUser.color || "#2b7c6a" }}>
                 {currentUser.name} (you)
-              </div>
-              <div className="mx-auto mt-0.5 w-2 h-1 overflow-hidden flex justify-center">
-                <div className="w-2 h-2 rotate-45 -translate-y-1" style={{ backgroundColor: currentUser.color || "#2b7c6a" }} />
               </div>
             </div>
           </button>
