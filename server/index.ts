@@ -202,14 +202,13 @@ wss.on("connection", async (ws: WebSocket, req) => {
   };
   doc.on("update", docUpdateHandler);
 
-  // Broadcast awareness updates
+  // Broadcast awareness updates — skip the sender so they don't receive
+  // their own state back and falsely trigger "X is typing" on their screen.
   const awarenessUpdateHandler = (
     { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
     origin: any
   ) => {
     const changedClients = added.concat(updated, removed);
-    // Remember which awareness records belong to this socket so they disappear
-    // immediately for every collaborator when the browser disconnects.
     if (origin === ws) changedClients.forEach((clientId) => controlledIds.add(clientId));
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageAwareness);
@@ -219,6 +218,8 @@ wss.on("connection", async (ws: WebSocket, req) => {
     );
     const buf = encoding.toUint8Array(encoder);
     conns.forEach((_, client) => {
+      // Don't echo awareness back to the client that sent it
+      if (client === ws) return;
       if (client.readyState === WebSocket.OPEN) {
         client.send(buf);
       }
