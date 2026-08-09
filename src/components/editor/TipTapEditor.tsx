@@ -50,8 +50,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const [isConnected, setIsConnected] = useState(false);
   const [typingNames, setTypingNames] = useState<string[]>([]);
 
-  // Stable session ID for this browser tab — never changes, used to filter self from awareness
-  const sessionId = useMemo(() => Math.random().toString(36).slice(2), []);
+  // Stable session ID for this browser tab — survives React StrictMode double-mounts
+  const sessionIdRef = React.useRef<string | null>(null);
+  if (!sessionIdRef.current) sessionIdRef.current = Math.random().toString(36).slice(2);
+  const sessionId = sessionIdRef.current;
 
   // Yjs document
   const ydoc = useMemo(() => new Y.Doc(), [documentId]);
@@ -160,12 +162,15 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     ].filter(Boolean) as any,
   });
 
-  // Handle typing status broadcasting
+  // Handle typing status broadcasting — only for LOCAL edits (not remote Yjs syncs)
   useEffect(() => {
     if (!editor || !provider) return;
 
     let timeout: NodeJS.Timeout;
-    const handleUpdate = () => {
+    const handleUpdate = ({ transaction }: { transaction: any }) => {
+      // Skip remote updates synced via Yjs — only local keystrokes should broadcast "typing"
+      if (transaction.getMeta("y-sync$")) return;
+
       provider.awareness.setLocalStateField("isTyping", true);
       clearTimeout(timeout);
       timeout = setTimeout(() => {
