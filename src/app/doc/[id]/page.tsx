@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -11,7 +11,7 @@ import {
   Lock,
   Globe,
   Check,
-  Sparkles,
+  UserRound,
 } from "lucide-react";
 import { TipTapEditor } from "@/components/editor/TipTapEditor";
 import { PresenceBar, ActiveUser } from "@/components/collaboration/PresenceBar";
@@ -31,6 +31,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
   const [comments, setComments] = useState<Comment[]>([]);
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [loadError, setLoadError] = useState("");
+  const [currentUser, setCurrentUser] = useState({ name: "Guest", color: "#2b7c6a" });
 
   // Modals & Drawers
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -38,11 +39,24 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [titleSaved, setTitleSaved] = useState(false);
 
-  // Default User State
-  const currentUser = {
-    name: "Anant",
-    color: "#06b6d4",
-    avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Anant",
+  useEffect(() => {
+    const savedName = window.sessionStorage.getItem("connect-guest-name");
+    const name = savedName || `Guest ${Math.floor(100 + Math.random() * 900)}`;
+    window.sessionStorage.setItem("connect-guest-name", name);
+    setCurrentUser({ name, color: "#2b7c6a" });
+  }, []);
+
+  const handlePresenceUpdate = useCallback((users: ActiveUser[], connected: boolean) => {
+    setActiveUsers(users);
+    setIsConnected(connected);
+  }, []);
+
+  const changeDisplayName = () => {
+    const name = window.prompt("Choose the name collaborators will see", currentUser.name)?.trim();
+    if (!name) return;
+    const nextUser = { ...currentUser, name: name.slice(0, 32) };
+    window.sessionStorage.setItem("connect-guest-name", nextUser.name);
+    setCurrentUser(nextUser);
   };
 
   useEffect(() => {
@@ -114,6 +128,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         {/* Center: Live Presence Bar */}
         <div className="flex items-center gap-3">
           <PresenceBar users={activeUsers} isConnected={isConnected} currentUser={currentUser} />
+          <button onClick={changeDisplayName} className="hidden items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-semibold text-[#466259] transition hover:bg-[#edf5ef] sm:flex" title="Change your display name"><UserRound className="size-3.5" />{currentUser.name}</button>
         </div>
 
         {/* Right: Actions (Share, History, Comments) */}
@@ -154,10 +169,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         {loadError ? <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl p-8 text-center"><div><h2 className="text-lg font-bold text-[#183b31]">Document unavailable</h2><p className="mt-2 max-w-sm text-sm leading-relaxed text-[#668077]">{loadError}</p><Link href="/" className="primary-action mt-6 inline-flex rounded-xl px-4 py-2.5 text-sm font-bold">Back to home</Link></div></div> : documentData ? <TipTapEditor
           documentId={documentData.id}
           currentUser={currentUser}
-          onPresenceUpdate={(users, connected) => {
-            setActiveUsers(users);
-            setIsConnected(connected);
-          }}
+          onPresenceUpdate={handlePresenceUpdate}
         /> : <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl text-sm text-[#668077]">Loading document…</div>}
       </main>
 
