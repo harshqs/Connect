@@ -149,6 +149,9 @@ wss.on("connection", async (ws: WebSocket, req) => {
     origin: any
   ) => {
     const changedClients = added.concat(updated, removed);
+    // Remember which awareness records belong to this socket so they disappear
+    // immediately for every collaborator when the browser disconnects.
+    if (origin === ws) changedClients.forEach((clientId) => controlledIds.add(clientId));
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, messageAwareness);
     encoding.writeVarUint8Array(

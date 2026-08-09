@@ -48,6 +48,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 }) => {
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [typingNames, setTypingNames] = useState<string[]>([]);
 
   // Initialize Yjs Document and WebSocket Provider
   const ydoc = useMemo(() => new Y.Doc(), [documentId]);
@@ -68,6 +69,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       color: currentUser.color,
       avatar: currentUser.avatar,
     });
+
+    const updateTypingNames = () => {
+      const names: string[] = [];
+      awareness.getStates().forEach((state: any) => {
+        if (state.isTyping && state.user?.name && state.user.name !== currentUser.name) names.push(state.user.name);
+      });
+      setTypingNames(names);
+    };
 
     wsProvider.on("status", (event: { status: "connected" | "disconnected" | "connecting" }) => {
       const connected = event.status === "connected";
@@ -95,10 +104,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     };
 
     awareness.on("change", updateAwareness);
+    awareness.on("change", updateTypingNames);
     setProvider(wsProvider);
 
     return () => {
       awareness.off("change", updateAwareness);
+      awareness.off("change", updateTypingNames);
       wsProvider.destroy();
       indexeddbProvider.destroy();
       ydoc.destroy();
@@ -318,6 +329,12 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
 
       {/* Editor Main Content Area */}
       <div className="editor-workarea relative min-h-[520px]">
+        {typingNames.length > 0 && (
+          <div className="absolute right-6 top-5 z-10 flex items-center gap-2 rounded-full border border-[#d8e8dd] bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#287d67] shadow-sm backdrop-blur">
+            <span className="flex gap-0.5"><i className="typing-dot" /><i className="typing-dot" /><i className="typing-dot" /></span>
+            {typingNames.length === 1 ? `${typingNames[0]} is typing` : `${typingNames.length} people are typing`}
+          </div>
+        )}
         <EditorContent editor={editor} className="prose prose-invert max-w-none focus:outline-none" />
       </div>
     </div>
