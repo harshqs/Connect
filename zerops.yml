@@ -3,6 +3,8 @@ zerops:
   - setup: api
     build:
       base: nodejs@22
+      prepareCommands:
+        - apt-get update && apt-get install -y openssl
       buildCommands:
         - npm ci --include=dev
         - npx prisma generate
@@ -11,6 +13,9 @@ zerops:
         - prisma/
         - node_modules/
         - package.json
+      cache:
+        - node_modules
+        - package-lock.json
     run:
       base: nodejs@22
       ports:
@@ -18,9 +23,9 @@ zerops:
           httpSupport: true
       envVariables:
         PORT: 3000
+      prepareCommands:
+        - apt-get update && apt-get install -y openssl
       initCommands:
-        # Run any pending DB migrations before the process starts.
-        # Safe to run on every deploy — already-applied migrations are skipped.
         - npx prisma migrate deploy
       start: node_modules/.bin/tsx server/index.ts
       healthCheck:
@@ -37,11 +42,12 @@ zerops:
         - npx prisma generate
         - npm run build
       deployFiles:
-        # standalone bundle — includes server + required node_modules
         - .next/standalone/
-        # static assets must be copied in alongside standalone
         - .next/static/  => .next/standalone/.next/static/
         - public/        => .next/standalone/public/
+      cache:
+        - node_modules
+        - package-lock.json
     run:
       base: nodejs@22
       ports:
