@@ -1,0 +1,50 @@
+# Zerops Deployment Configuration for "Connect" Real-Time Notepad
+# Zerops Hackathon Ready Specification
+
+project:
+  name: connect-app
+
+services:
+  # Node.js WebSocket & REST API Backend Service
+  - hostname: connect-backend
+    type: nodejs@20
+    build:
+      base: nodejs@20
+      buildCommands:
+        - npm ci
+        - npx prisma generate
+      deployFiles:
+        - server/
+        - src/lib/
+        - prisma/
+        - package.json
+        - package-lock.json
+        - tsconfig.json
+    run:
+      base: nodejs@20
+      start: npm run server
+      ports:
+        - port: 1234
+          httpSupport: true
+
+  # Next.js Frontend Application Service
+  - hostname: connect-frontend
+    type: nodejs@20
+    build:
+      base: nodejs@20
+      buildCommands:
+        - npm ci
+        - npx prisma generate
+        - npm run build
+      deployFiles:
+        - .next/
+        - public/
+        - package.json
+        - package-lock.json
+        - next.config.ts
+    run:
+      base: nodejs@20
+      start: npm start
+      ports:
+        - port: 3000
+          httpSupport: true

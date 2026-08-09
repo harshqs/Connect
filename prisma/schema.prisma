@@ -1,0 +1,76 @@
+// Connect Collaborative Notepad Prisma Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  avatar    String?
+  color     String   @default("#6366f1")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownedDocuments Document[]       @relation("DocumentOwner")
+  memberships    DocumentMember[]
+  comments       Comment[]
+}
+
+model Document {
+  id          String   @id @default(uuid())
+  title       String   @default("Untitled Document")
+  content     String?  // Text snapshot or HTML preview
+  yState      Bytes?   // Persisted Yjs update; restores the collaborative document after restart
+  isPublic    Boolean  @default(false)
+  shareToken  String?  @unique
+  ownerId     String
+  owner       User     @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     DocumentMember[]
+  comments    Comment[]
+  versions    DocumentVersion[]
+}
+
+model DocumentMember {
+  id         String   @id @default(uuid())
+  documentId String
+  userId     String
+  role       String   @default("editor") // "owner", "editor", "viewer"
+  createdAt  DateTime @default(now())
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  documentId String
+  userId     String
+  text       String
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DocumentVersion {
+  id         String   @id @default(uuid())
+  documentId String
+  title      String
+  content    String
+  editedBy   String
+  createdAt  DateTime @default(now())
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
