@@ -11,7 +11,9 @@ function AuthCallbackInner() {
     const token = params.get("token");
     if (token) {
       window.localStorage.setItem("connect-session", token);
-      router.replace("/dashboard");
+      // Send new users to profile setup, returning users straight to dashboard
+      const isNew = params.get("new") === "1";
+      router.replace(isNew ? "/profile/setup" : "/dashboard");
     } else {
       router.replace("/?auth=failed");
     }

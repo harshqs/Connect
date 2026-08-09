@@ -48,15 +48,33 @@ const currentUser = async (req: Request) => {
 
 app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"], session: false }));
 app.get("/api/auth/google/callback", passport.authenticate("google", { session: false, failureRedirect: `${process.env.FRONTEND_URL || "http://localhost:3000"}/?auth=failed` }), async (req: Request, res: Response) => {
-  const user = req.user as { id: string };
+  const user = req.user as { id: string; createdAt: Date };
   const token = randomBytes(32).toString("base64url");
   await prisma.session.create({ data: { token, userId: user.id, expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) } });
-  res.redirect(`${process.env.FRONTEND_URL || "http://localhost:3000"}/auth/callback?token=${token}`);
+  // If account was just created (within last 10 seconds) treat as new user → show profile setup
+  const isNew = user.createdAt && (Date.now() - new Date(user.createdAt).getTime()) < 10_000;
+  const redirect = `${process.env.FRONTEND_URL || "http://localhost:3000"}/auth/callback?token=${token}${isNew ? "&new=1" : ""}`;
+  res.redirect(redirect);
 });
 app.get("/api/auth/me", async (req: Request, res: Response) => {
   const user = await currentUser(req);
   if (!user) return res.status(401).json({ error: "Sign in required" });
   res.json(user);
+});
+
+app.patch("/api/auth/profile", async (req: Request, res: Response) => {
+  const user = await currentUser(req);
+  if (!user) return res.status(401).json({ error: "Sign in required" });
+  const { name, color, avatar } = req.body;
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      ...(name !== undefined && { name: String(name).slice(0, 64) }),
+      ...(color !== undefined && { color: String(color) }),
+      ...(avatar !== undefined && { avatar: String(avatar) }),
+    },
+  });
+  res.json(updated);
 });
 
 app.get("/health", (_req: Request, res: Response) => {

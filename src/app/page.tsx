@@ -1,14 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, FileText, Globe2, Radio, ShieldCheck, Users } from "lucide-react";
-import { createDocument, googleSignInUrl } from "@/lib/api";
+import { createDocument, fetchCurrentUser, googleSignInUrl } from "@/lib/api";
+import { Suspense } from "react";
 
-export default function LandingPage() {
+function LandingPageInner() {
   const router = useRouter();
+  const params = useSearchParams();
   const [createError, setCreateError] = useState("");
+  const authFailed = params.get("auth") === "failed";
+
+  useEffect(() => {
+    // If a valid session exists, skip the landing page entirely
+    fetchCurrentUser()
+      .then(() => router.replace("/dashboard"))
+      .catch(() => {}); // Not signed in — stay on landing page
+  }, [router]);
+
   const handleCreateDocument = async () => {
     setCreateError("");
     try {
@@ -28,10 +39,16 @@ export default function LandingPage() {
         </Link>
         <div className="flex items-center gap-3">
           <a href={googleSignInUrl} className="secondary-action rounded-xl px-4 py-2 text-sm font-semibold">Sign in with Google</a>
-          <Link href="/dashboard" className="secondary-action rounded-xl px-4 py-2 text-sm font-semibold">Workspace</Link>
-          <button onClick={handleCreateDocument} className="primary-action hidden rounded-xl px-4 py-2 text-sm font-bold sm:block">New note</button>
         </div>
       </header>
+
+      {authFailed && (
+        <div className="mx-auto max-w-7xl px-6 md:px-10 mt-4">
+          <div className="rounded-xl border border-[#efc0b4] bg-[#fff4f0]/20 px-4 py-3 text-sm text-[#ffd0c5]">
+            Sign-in failed or was cancelled. Please try again.
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-7xl px-6 pb-14 pt-14 md:px-10 md:pt-24">
         <section className="grid items-center gap-14 lg:grid-cols-[1fr_.9fr]">
@@ -46,11 +63,11 @@ export default function LandingPage() {
               Connect keeps ideas, comments, and every contributor together in one calm, live document—so your team can think in the open.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <button onClick={handleCreateDocument} className="primary-action inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 font-bold">
-                Start a shared note <ArrowRight className="size-4" />
-              </button>
+              <a href={googleSignInUrl} className="primary-action inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 font-bold">
+                Get started with Google <ArrowRight className="size-4" />
+              </a>
               <button onClick={handleCreateDocument} className="secondary-action inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 font-semibold">
-                <Globe2 className="size-4" /> Create a live document
+                <Globe2 className="size-4" /> Try without signing in
               </button>
             </div>
             {createError && <p className="mt-4 text-sm font-medium text-[#ffd0c5]">{createError}</p>}
@@ -84,5 +101,17 @@ export default function LandingPage() {
       </main>
       <footer className="mx-auto flex max-w-7xl justify-between border-t border-white/10 px-6 py-7 text-xs text-[#8ca49a] md:px-10"><span>Connect · Real-time collaborative notes</span><span>Built for focused teams</span></footer>
     </div>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense fallback={
+      <div className="app-shell min-h-screen text-[#f5f1e8] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#8fd4af]/40 border-t-[#8fd4af] rounded-full animate-spin" />
+      </div>
+    }>
+      <LandingPageInner />
+    </Suspense>
   );
 }
