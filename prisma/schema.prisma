@@ -1,7 +1,6 @@
-// Connect Collaborative Notepad Prisma Schema
+﻿// Connect Collaborative Notepad Prisma Schema
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 datasource db {

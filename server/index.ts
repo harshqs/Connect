@@ -1,10 +1,8 @@
-import express, { Request, Response } from "express";
+﻿import express, { Request, Response } from "express";
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
 import * as Y from "yjs";
 import * as syncProtocol from "y-protocols/sync";
 import * as awarenessProtocol from "y-protocols/awareness";
@@ -12,28 +10,8 @@ import { encoding, decoding } from "lib0";
 import { randomBytes } from "crypto";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { execSync } from "child_process";
 
-// Run DB migrations on startup using the CLI bundled in node_modules.
-// This runs in the Node.js process where DATABASE_URL is available,
-// and uses the pre-generated Prisma binary that matches the build container.
-try {
-  console.log("Running database migrations...");
-  execSync("node node_modules/.bin/prisma migrate deploy", {
-    stdio: "inherit",
-    env: process.env,
-  });
-  console.log("Migrations complete.");
-} catch (err) {
-  // Log but don't crash — tables may already exist from a previous deploy.
-  console.warn("Migration warning (non-fatal):", err);
-}
-
-// Use pg driver adapter so Prisma needs no native OpenSSL binary at runtime
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter } as any);
-
+const prisma = new PrismaClient();
 const app = express();
 const server = http.createServer(app);
 
@@ -60,7 +38,7 @@ passport.use(new GoogleStrategy({
 }));
 app.use(passport.initialize());
 
-// ─── Auth helpers ─────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Auth helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 const currentUser = async (req: Request) => {
   const token = req.header("authorization")?.replace(/^Bearer\s+/i, "");
@@ -97,7 +75,7 @@ const authorizeDocAccess = async (
   return { user, member };
 };
 
-// ─── Auth routes ──────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Auth routes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"], session: false }));
 app.get("/api/auth/google/callback", passport.authenticate("google", { session: false, failureRedirect: `${process.env.FRONTEND_URL || "http://localhost:3000"}/?auth=failed` }), async (req: Request, res: Response) => {
@@ -134,7 +112,7 @@ app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, service: "connect-api" });
 });
 
-// ─── Yjs / WebSocket real-time collaboration ──────────────────────────────────
+// ΓöÇΓöÇΓöÇ Yjs / WebSocket real-time collaboration ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 interface Room {
   doc: Y.Doc;
@@ -271,7 +249,7 @@ wss.on("connection", async (ws: WebSocket, req) => {
   });
 });
 
-// ─── Document REST API ────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Document REST API ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 // Helper: Ensure default user exists (legacy / demo only)
 const getOrCreateDefaultUser = async (name = "Anant", email = "anant@example.com") => {
@@ -361,7 +339,7 @@ app.get("/api/documents/:id", async (req: Request, res: Response) => {
       doc = await prisma.document.create({
         data: {
           id: "demo-doc-123",
-          title: "🚀 Welcome to Connect Notepad",
+          title: "≡ƒÜÇ Welcome to Connect Notepad",
           content: "Welcome to Connect! Start editing this real-time document together.",
           ownerId: user.id,
           shareToken: "demo-share",
@@ -386,7 +364,7 @@ app.get("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Update document — requires owner or editor
+// Update document ΓÇö requires owner or editor
 app.patch("/api/documents/:id", async (req: Request, res: Response) => {
   try {
     const docId = req.params.id as string;
@@ -400,7 +378,7 @@ app.patch("/api/documents/:id", async (req: Request, res: Response) => {
         ...(title !== undefined && { title }),
         ...(isPublic !== undefined && { isPublic }),
         ...(content !== undefined && { content }),
-        // folderId and isStarred are per-user organization — only owner changes these
+        // folderId and isStarred are per-user organization ΓÇö only owner changes these
         ...(folderId !== undefined && auth.member.role === "owner" && { folderId: folderId || null }),
         ...(isStarred !== undefined && auth.member.role === "owner" && { isStarred }),
       },
@@ -411,7 +389,7 @@ app.patch("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Delete document — requires owner only
+// Delete document ΓÇö requires owner only
 app.delete("/api/documents/:id", async (req: Request, res: Response) => {
   try {
     const docId = req.params.id as string;
@@ -425,7 +403,7 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Add comment — requires any membership; attribution via session token
+// Add comment ΓÇö requires any membership; attribution via session token
 app.post("/api/documents/:id/comments", async (req: Request, res: Response) => {
   try {
     const docId = req.params.id as string;
@@ -445,7 +423,7 @@ app.post("/api/documents/:id/comments", async (req: Request, res: Response) => {
   }
 });
 
-// Save version snapshot — requires owner or editor
+// Save version snapshot ΓÇö requires owner or editor
 app.post("/api/documents/:id/versions", async (req: Request, res: Response) => {
   try {
     const docId = req.params.id as string;
@@ -467,7 +445,7 @@ app.post("/api/documents/:id/versions", async (req: Request, res: Response) => {
   }
 });
 
-// ─── Folder REST API ──────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Folder REST API ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 // List folders with document counts
 app.get("/api/folders", async (req: Request, res: Response) => {
@@ -511,8 +489,7 @@ app.patch("/api/folders/:id", async (req: Request, res: Response) => {
     const user = await currentUser(req);
     if (!user) return res.status(401).json({ error: "Sign in required" });
 
-    const folderId = req.params.id as string;
-    const folder = await prisma.folder.findUnique({ where: { id: folderId } });
+    const folder = await prisma.folder.findUnique({ where: { id: req.params.id } });
     if (!folder || folder.ownerId !== user.id) {
       return res.status(403).json({ error: "You do not have permission to rename this folder" });
     }
@@ -521,7 +498,7 @@ app.patch("/api/folders/:id", async (req: Request, res: Response) => {
     if (!name?.trim()) return res.status(400).json({ error: "Folder name is required" });
 
     const updated = await prisma.folder.update({
-      where: { id: folderId },
+      where: { id: req.params.id },
       data: { name: String(name).slice(0, 64) },
       include: { _count: { select: { documents: true } } },
     });
@@ -531,27 +508,26 @@ app.patch("/api/folders/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Delete folder — documents inside go back to root (folderId = null via SetNull)
+// Delete folder ΓÇö documents inside go back to root (folderId = null via SetNull)
 app.delete("/api/folders/:id", async (req: Request, res: Response) => {
   try {
     const user = await currentUser(req);
     if (!user) return res.status(401).json({ error: "Sign in required" });
 
-    const folderId = req.params.id as string;
-    const folder = await prisma.folder.findUnique({ where: { id: folderId } });
+    const folder = await prisma.folder.findUnique({ where: { id: req.params.id } });
     if (!folder || folder.ownerId !== user.id) {
       return res.status(403).json({ error: "You do not have permission to delete this folder" });
     }
 
-    await prisma.folder.delete({ where: { id: folderId } });
+    await prisma.folder.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── Start server ─────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Start server ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 server.listen(PORT, () => {
-  console.log(`🚀 Connect Collaboration & API Server running on port ${PORT}`);
+  console.log(`≡ƒÜÇ Connect Collaboration & API Server running on port ${PORT}`);
 });
