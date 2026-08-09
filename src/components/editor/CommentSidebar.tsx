@@ -32,7 +32,7 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({
 
     try {
       setIsSubmitting(true);
-      const newComment = await addComment(documentId, commentText.trim(), currentUserName);
+      const newComment = await addComment(documentId, commentText.trim());
       onCommentAdded(newComment);
       setCommentText("");
     } catch (err) {

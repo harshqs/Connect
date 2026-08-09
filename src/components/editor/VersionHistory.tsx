@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { History, X, Clock, RotateCcw, Plus } from "lucide-react";
+import { History, X, Clock, RotateCcw, Plus, CheckCircle2 } from "lucide-react";
 import { DocumentVersion, createVersionSnapshot } from "@/lib/api";
 
 interface VersionHistoryProps {
@@ -26,6 +26,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
   currentUserName = "Collaborator",
 }) => {
   const [saving, setSaving] = useState(false);
+  const [restoredId, setRestoredId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -33,13 +34,20 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
     try {
       setSaving(true);
       const title = `Version ${versions.length + 1}`;
-      const newVersion = await createVersionSnapshot(documentId, title, currentContent, currentUserName);
+      // editedBy is now determined server-side from the auth token
+      const newVersion = await createVersionSnapshot(documentId, title, currentContent);
       onSnapshotSaved(newVersion);
     } catch (err) {
       console.error("Failed to save snapshot", err);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleRestore = (ver: DocumentVersion) => {
+    onRestoreVersion(ver.content);
+    setRestoredId(ver.id);
+    setTimeout(() => setRestoredId(null), 2500);
   };
 
   return (
@@ -88,11 +96,18 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[11px] text-indigo-400">Edited by {ver.editedBy}</span>
                   <button
-                    onClick={() => onRestoreVersion(ver.content)}
-                    className="flex items-center gap-1 text-[11px] text-slate-300 hover:text-white px-2 py-0.5 rounded bg-slate-700/60 hover:bg-indigo-600 transition"
+                    onClick={() => handleRestore(ver)}
+                    className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition ${
+                      restoredId === ver.id
+                        ? "bg-emerald-600 text-white"
+                        : "text-slate-300 hover:text-white bg-slate-700/60 hover:bg-indigo-600"
+                    }`}
                   >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Restore</span>
+                    {restoredId === ver.id ? (
+                      <><CheckCircle2 className="w-3 h-3" /><span>Restored!</span></>
+                    ) : (
+                      <><RotateCcw className="w-3 h-3" /><span>Restore</span></>
+                    )}
                   </button>
                 </div>
               </div>

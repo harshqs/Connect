@@ -22,6 +22,7 @@ model User {
   memberships    DocumentMember[]
   comments       Comment[]
   sessions       Session[]
+  folders        Folder[]
 }
 
 model Session {
@@ -34,15 +35,28 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model Folder {
+  id        String     @id @default(uuid())
+  name      String
+  ownerId   String
+  createdAt DateTime   @default(now())
+
+  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  documents Document[]
+}
+
 model Document {
   id          String   @id @default(uuid())
   title       String   @default("Untitled Document")
   content     String?  // Text snapshot or HTML preview
   yState      Bytes?   // Persisted Yjs update; restores the collaborative document after restart
   isPublic    Boolean  @default(false)
+  isStarred   Boolean  @default(false)
   shareToken  String?  @unique
   ownerId     String
   owner       User     @relation("DocumentOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  folderId    String?
+  folder      Folder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -86,3 +100,4 @@ model DocumentVersion {
 
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
+

@@ -38,6 +38,8 @@ passport.use(new GoogleStrategy({
 }));
 app.use(passport.initialize());
 
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+
 const currentUser = async (req: Request) => {
   const token = req.header("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return null;
@@ -46,16 +48,45 @@ const currentUser = async (req: Request) => {
   return session.user;
 };
 
+/**
+ * Verify the caller is authenticated and has the required role on the document.
+ * Throws with a Response-ready error if not. Returns { user, member } on success.
+ *
+ * requiredRoles defaults to ["owner", "editor", "viewer"] (any member).
+ */
+const authorizeDocAccess = async (
+  req: Request,
+  res: Response,
+  docId: string,
+  requiredRoles: string[] = ["owner", "editor", "viewer"]
+): Promise<{ user: NonNullable<Awaited<ReturnType<typeof currentUser>>>; member: { role: string } } | null> => {
+  const user = await currentUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Sign in required" });
+    return null;
+  }
+  const member = await prisma.documentMember.findUnique({
+    where: { documentId_userId: { documentId: docId, userId: user.id } },
+  });
+  if (!member || !requiredRoles.includes(member.role)) {
+    res.status(403).json({ error: "You do not have permission to perform this action" });
+    return null;
+  }
+  return { user, member };
+};
+
+// ─── Auth routes ──────────────────────────────────────────────────────────────
+
 app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"], session: false }));
 app.get("/api/auth/google/callback", passport.authenticate("google", { session: false, failureRedirect: `${process.env.FRONTEND_URL || "http://localhost:3000"}/?auth=failed` }), async (req: Request, res: Response) => {
   const user = req.user as { id: string; createdAt: Date };
   const token = randomBytes(32).toString("base64url");
   await prisma.session.create({ data: { token, userId: user.id, expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) } });
-  // If account was just created (within last 10 seconds) treat as new user → show profile setup
   const isNew = user.createdAt && (Date.now() - new Date(user.createdAt).getTime()) < 10_000;
   const redirect = `${process.env.FRONTEND_URL || "http://localhost:3000"}/auth/callback?token=${token}${isNew ? "&new=1" : ""}`;
   res.redirect(redirect);
 });
+
 app.get("/api/auth/me", async (req: Request, res: Response) => {
   const user = await currentUser(req);
   if (!user) return res.status(401).json({ error: "Sign in required" });
@@ -81,7 +112,8 @@ app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, service: "connect-api" });
 });
 
-// In-Memory Documents Map for Yjs CRDT Sync
+// ─── Yjs / WebSocket real-time collaboration ──────────────────────────────────
+
 interface Room {
   doc: Y.Doc;
   awareness: awarenessProtocol.Awareness;
@@ -100,7 +132,6 @@ const getOrCreateRoom = async (docId: string): Promise<Room> => {
     const awareness = new awarenessProtocol.Awareness(doc);
     const conns = new Map<WebSocket, Set<number>>();
 
-    // Save document state periodically to database
     let saveTimeout: NodeJS.Timeout | null = null;
     doc.on("update", (update: Uint8Array) => {
       if (saveTimeout) clearTimeout(saveTimeout);
@@ -123,11 +154,9 @@ const getOrCreateRoom = async (docId: string): Promise<Room> => {
   return room;
 };
 
-// WebSocket Message Types
 const messageSync = 0;
 const messageAwareness = 1;
 
-// Setup WebSocket Server for Yjs Collaboration
 const wss = new WebSocketServer({ server, path: "/yjs" });
 
 wss.on("connection", async (ws: WebSocket, req) => {
@@ -142,28 +171,22 @@ wss.on("connection", async (ws: WebSocket, req) => {
   const controlledIds = new Set<number>();
   conns.set(ws, controlledIds);
 
-  // Send initial sync step 1
   const encoder = encoding.createEncoder();
   encoding.writeVarUint(encoder, messageSync);
   syncProtocol.writeSyncStep1(encoder, doc);
   ws.send(encoding.toUint8Array(encoder));
 
-  // Send current awareness states
   const awarenessStates = awareness.getStates();
   if (awarenessStates.size > 0) {
     const awarenessEncoder = encoding.createEncoder();
     encoding.writeVarUint(awarenessEncoder, messageAwareness);
     encoding.writeVarUint8Array(
       awarenessEncoder,
-      awarenessProtocol.encodeAwarenessUpdate(
-        awareness,
-        Array.from(awarenessStates.keys())
-      )
+      awarenessProtocol.encodeAwarenessUpdate(awareness, Array.from(awarenessStates.keys()))
     );
     ws.send(encoding.toUint8Array(awarenessEncoder));
   }
 
-  // Handle incoming WebSocket messages
   ws.on("message", (message: ArrayBuffer) => {
     try {
       const buffer = new Uint8Array(message);
@@ -174,9 +197,7 @@ wss.on("connection", async (ws: WebSocket, req) => {
         const replyEncoder = encoding.createEncoder();
         encoding.writeVarUint(replyEncoder, messageSync);
         syncProtocol.readSyncMessage(decoder, replyEncoder, doc, ws);
-        if (encoding.length(replyEncoder) > 1) {
-          ws.send(encoding.toUint8Array(replyEncoder));
-        }
+        if (encoding.length(replyEncoder) > 1) ws.send(encoding.toUint8Array(replyEncoder));
       } else if (messageType === messageAwareness) {
         const update = decoding.readVarUint8Array(decoder);
         awarenessProtocol.applyAwarenessUpdate(awareness, update, ws);
@@ -186,7 +207,6 @@ wss.on("connection", async (ws: WebSocket, req) => {
     }
   });
 
-  // Broadcast doc updates to all other clients in room
   const docUpdateHandler = (update: Uint8Array, origin: any) => {
     if (origin !== ws) {
       const encoder = encoding.createEncoder();
@@ -194,16 +214,12 @@ wss.on("connection", async (ws: WebSocket, req) => {
       syncProtocol.writeUpdate(encoder, update);
       const buf = encoding.toUint8Array(encoder);
       conns.forEach((_, client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(buf);
-        }
+        if (client.readyState === WebSocket.OPEN) client.send(buf);
       });
     }
   };
   doc.on("update", docUpdateHandler);
 
-  // Broadcast awareness updates — skip the sender so they don't receive
-  // their own state back and falsely trigger "X is typing" on their screen.
   const awarenessUpdateHandler = (
     { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
     origin: any
@@ -218,11 +234,8 @@ wss.on("connection", async (ws: WebSocket, req) => {
     );
     const buf = encoding.toUint8Array(encoder);
     conns.forEach((_, client) => {
-      // Don't echo awareness back to the client that sent it
-      if (client === ws) return;
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(buf);
-      }
+      if (client === ws) return; // don't echo back to sender
+      if (client.readyState === WebSocket.OPEN) client.send(buf);
     });
   };
   awareness.on("update", awarenessUpdateHandler);
@@ -230,37 +243,25 @@ wss.on("connection", async (ws: WebSocket, req) => {
   ws.on("close", () => {
     doc.off("update", docUpdateHandler);
     awareness.off("update", awarenessUpdateHandler);
-    awarenessProtocol.removeAwarenessStates(
-      awareness,
-      Array.from(controlledIds),
-      null
-    );
+    awarenessProtocol.removeAwarenessStates(awareness, Array.from(controlledIds), null);
     conns.delete(ws);
-    if (conns.size === 0) {
-      rooms.delete(docId);
-    }
+    if (conns.size === 0) rooms.delete(docId);
   });
 });
 
-// REST API Endpoints
+// ─── Document REST API ────────────────────────────────────────────────────────
 
-// Helper: Ensure user exists
+// Helper: Ensure default user exists (legacy / demo only)
 const getOrCreateDefaultUser = async (name = "Anant", email = "anant@example.com") => {
   let user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`,
-        color: "#6366f1",
-      },
+      data: { name, email, avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`, color: "#6366f1" },
     });
   }
   return user;
 };
 
-// 1. Get or create current user profile
 app.get("/api/users/me", async (req: Request, res: Response) => {
   try {
     const user = await getOrCreateDefaultUser();
@@ -270,7 +271,7 @@ app.get("/api/users/me", async (req: Request, res: Response) => {
   }
 });
 
-// 2. List all documents for user
+// List documents
 app.get("/api/documents", async (req: Request, res: Response) => {
   try {
     const user = await currentUser(req);
@@ -296,7 +297,7 @@ app.get("/api/documents", async (req: Request, res: Response) => {
   }
 });
 
-// 3. Create document
+// Create document
 app.post("/api/documents", async (req: Request, res: Response) => {
   try {
     const { title = "Untitled Document" } = req.body;
@@ -309,12 +310,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         ownerId: user.id,
         content: "",
         shareToken: randomBytes(18).toString("base64url"),
-        members: {
-          create: {
-            userId: user.id,
-            role: "owner",
-          },
-        },
+        members: { create: { userId: user.id, role: "owner" } },
       },
       include: { owner: true, members: { include: { user: true } } },
     });
@@ -324,14 +320,12 @@ app.post("/api/documents", async (req: Request, res: Response) => {
   }
 });
 
-// 4. Get single document details
+// Get single document (public, no auth required)
 app.get("/api/documents/:id", async (req: Request, res: Response) => {
   try {
     const docId = req.params.id as string;
     let doc = await prisma.document.findFirst({
-      where: {
-        OR: [{ id: docId }, { shareToken: docId }],
-      },
+      where: { OR: [{ id: docId }, { shareToken: docId }] },
       include: {
         owner: true,
         members: { include: { user: true } },
@@ -360,10 +354,7 @@ app.get("/api/documents/:id", async (req: Request, res: Response) => {
       });
     }
 
-    if (!doc) {
-      return res.status(404).json({ error: "Document not found" });
-    }
-
+    if (!doc) return res.status(404).json({ error: "Document not found" });
     if (doc.shareToken === docId && !doc.isPublic) {
       return res.status(403).json({ error: "This share link is not active" });
     }
@@ -373,18 +364,23 @@ app.get("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
-// 5. Update / Rename document
+// Update document — requires owner or editor
 app.patch("/api/documents/:id", async (req: Request, res: Response) => {
   try {
     const docId = req.params.id as string;
-    const { title, isPublic, content } = req.body;
+    const auth = await authorizeDocAccess(req, res, docId, ["owner", "editor"]);
+    if (!auth) return;
 
+    const { title, isPublic, content, folderId, isStarred } = req.body;
     const doc = await prisma.document.update({
       where: { id: docId },
       data: {
         ...(title !== undefined && { title }),
         ...(isPublic !== undefined && { isPublic }),
         ...(content !== undefined && { content }),
+        // folderId and isStarred are per-user organization — only owner changes these
+        ...(folderId !== undefined && auth.member.role === "owner" && { folderId: folderId || null }),
+        ...(isStarred !== undefined && auth.member.role === "owner" && { isStarred }),
       },
     });
     res.json(doc);
@@ -393,10 +389,13 @@ app.patch("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
-// 6. Delete document
+// Delete document — requires owner only
 app.delete("/api/documents/:id", async (req: Request, res: Response) => {
   try {
     const docId = req.params.id as string;
+    const auth = await authorizeDocAccess(req, res, docId, ["owner"]);
+    if (!auth) return;
+
     await prisma.document.delete({ where: { id: docId } });
     res.json({ success: true });
   } catch (err: any) {
@@ -404,21 +403,18 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
-// 7. Add Comment
+// Add comment — requires any membership; attribution via session token
 app.post("/api/documents/:id/comments", async (req: Request, res: Response) => {
   try {
     const docId = req.params.id as string;
-    const { text, userName = "Collaborator" } = req.body;
+    const auth = await authorizeDocAccess(req, res, docId, ["owner", "editor", "viewer"]);
+    if (!auth) return;
 
-    let user = await prisma.user.findFirst({ where: { name: userName } });
-    if (!user) user = await getOrCreateDefaultUser(userName, `${userName.toLowerCase()}@example.com`);
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: "Comment text is required" });
 
     const comment = await prisma.comment.create({
-      data: {
-        documentId: docId,
-        userId: user.id,
-        text,
-      },
+      data: { documentId: docId, userId: auth.user.id, text: String(text).slice(0, 1000) },
       include: { user: true },
     });
     res.json(comment);
@@ -427,18 +423,20 @@ app.post("/api/documents/:id/comments", async (req: Request, res: Response) => {
   }
 });
 
-// 8. Add Version History Snapshot
+// Save version snapshot — requires owner or editor
 app.post("/api/documents/:id/versions", async (req: Request, res: Response) => {
   try {
     const docId = req.params.id as string;
-    const { title, content, editedBy } = req.body;
+    const auth = await authorizeDocAccess(req, res, docId, ["owner", "editor"]);
+    if (!auth) return;
 
+    const { title, content } = req.body;
     const version = await prisma.documentVersion.create({
       data: {
         documentId: docId,
         title: title || "Snapshot",
         content: content || "",
-        editedBy: editedBy || "Anant",
+        editedBy: auth.user.name, // use actual session user, not body field
       },
     });
     res.json(version);
@@ -447,7 +445,89 @@ app.post("/api/documents/:id/versions", async (req: Request, res: Response) => {
   }
 });
 
-// Start Server
+// ─── Folder REST API ──────────────────────────────────────────────────────────
+
+// List folders with document counts
+app.get("/api/folders", async (req: Request, res: Response) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: "Sign in required" });
+
+    const folders = await prisma.folder.findMany({
+      where: { ownerId: user.id },
+      include: { _count: { select: { documents: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    res.json(folders);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create folder
+app.post("/api/folders", async (req: Request, res: Response) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: "Sign in required" });
+
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "Folder name is required" });
+
+    const folder = await prisma.folder.create({
+      data: { name: String(name).slice(0, 64), ownerId: user.id },
+      include: { _count: { select: { documents: true } } },
+    });
+    res.json(folder);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Rename folder
+app.patch("/api/folders/:id", async (req: Request, res: Response) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: "Sign in required" });
+
+    const folder = await prisma.folder.findUnique({ where: { id: req.params.id } });
+    if (!folder || folder.ownerId !== user.id) {
+      return res.status(403).json({ error: "You do not have permission to rename this folder" });
+    }
+
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "Folder name is required" });
+
+    const updated = await prisma.folder.update({
+      where: { id: req.params.id },
+      data: { name: String(name).slice(0, 64) },
+      include: { _count: { select: { documents: true } } },
+    });
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete folder — documents inside go back to root (folderId = null via SetNull)
+app.delete("/api/folders/:id", async (req: Request, res: Response) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: "Sign in required" });
+
+    const folder = await prisma.folder.findUnique({ where: { id: req.params.id } });
+    if (!folder || folder.ownerId !== user.id) {
+      return res.status(403).json({ error: "You do not have permission to delete this folder" });
+    }
+
+    await prisma.folder.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Start server ─────────────────────────────────────────────────────────────
+
 server.listen(PORT, () => {
   console.log(`🚀 Connect Collaboration & API Server running on port ${PORT}`);
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState, use } from "react";
+import React, { useCallback, useEffect, useRef, useState, use } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -8,19 +8,22 @@ import {
   History,
   MessageSquare,
   ArrowLeft,
-  Lock,
-  Globe,
   Check,
 } from "lucide-react";
-import { TipTapEditor } from "@/components/editor/TipTapEditor";
+import { TipTapEditor, TipTapEditorHandle } from "@/components/editor/TipTapEditor";
 import { PresenceBar, ActiveUser } from "@/components/collaboration/PresenceBar";
 import { ShareModal } from "@/components/collaboration/ShareModal";
 import { VersionHistory } from "@/components/editor/VersionHistory";
 import { CommentSidebar } from "@/components/editor/CommentSidebar";
-import { DocumentItem, fetchDocumentById, fetchCurrentUser, updateDocument, Comment, DocumentVersion } from "@/lib/api";
+import {
+  DocumentItem, fetchDocumentById, fetchCurrentUser,
+  updateDocument, Comment, DocumentVersion,
+} from "@/lib/api";
 
 export default function DocumentEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: docId } = use(params);
+
+  const editorRef = useRef<TipTapEditorHandle>(null);
 
   const [documentData, setDocumentData] = useState<DocumentItem | null>(null);
   const [title, setTitle] = useState("Untitled Document");
@@ -31,6 +34,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [loadError, setLoadError] = useState("");
   const [currentUser, setCurrentUser] = useState<{ name: string; color: string; avatar?: string }>({ name: "Guest", color: "#2b7c6a" });
+  const [restoreToast, setRestoreToast] = useState(false);
 
   // Modals & Drawers
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -39,14 +43,12 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
   const [titleSaved, setTitleSaved] = useState(false);
 
   useEffect(() => {
-    // Try to load the signed-in user from the API; fall back to guest name
     async function loadUser() {
       try {
         const user = await fetchCurrentUser();
         setCurrentUser({ name: user.name, color: user.color, avatar: user.avatar });
         window.sessionStorage.setItem("connect-guest-name", user.name);
       } catch {
-        // Not signed in — use a persistent guest name
         const savedName = window.sessionStorage.getItem("connect-guest-name");
         const name = savedName || `Guest ${Math.floor(100 + Math.random() * 900)}`;
         window.sessionStorage.setItem("connect-guest-name", name);
@@ -78,7 +80,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         setIsPublic(doc.isPublic);
         if (doc.comments) setComments(doc.comments);
         if (doc.versions) setVersions(doc.versions);
-      } catch (err) {
+      } catch {
         setLoadError("This document could not be loaded. Start the collaboration server and make sure the link is still active.");
       }
     }
@@ -106,8 +108,22 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  const handleRestoreVersion = (content: string) => {
+    editorRef.current?.restoreContent(content);
+    setRestoreToast(true);
+    setTimeout(() => setRestoreToast(false), 3000);
+  };
+
   return (
     <div className="document-shell flex flex-col justify-between">
+      {/* Restore toast */}
+      {restoreToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg">
+          <Check className="w-4 h-4" />
+          Version restored — changes synced to all collaborators
+        </div>
+      )}
+
       {/* Top Navbar */}
       <header className="document-header sticky top-0 z-30 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         {/* Left: Back & Editable Title */}
@@ -138,7 +154,6 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         {/* Center: Live Presence Bar */}
         <div className="flex items-center gap-3">
           <PresenceBar users={activeUsers} isConnected={isConnected} currentUser={currentUser} />
-          {/* Current user's own avatar — click to change display name */}
           <button
             onClick={changeDisplayName}
             title={`You: ${currentUser.name} — click to rename`}
@@ -154,7 +169,6 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
                 currentUser.name ? currentUser.name.charAt(0).toUpperCase() : "?"
               )}
             </div>
-            {/* Tooltip — below */}
             <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity z-30">
               <div className="mx-auto mb-0.5 w-2 h-1 overflow-hidden flex justify-center">
                 <div className="w-2 h-2 rotate-45 translate-y-1" style={{ backgroundColor: currentUser.color || "#2b7c6a" }} />
@@ -166,7 +180,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
           </button>
         </div>
 
-        {/* Right: Actions (Share, History, Comments) */}
+        {/* Right: Actions */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCommentsOpen(!commentsOpen)}
@@ -201,11 +215,24 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
 
       {/* Main Editor Container */}
       <main className="w-full max-w-6xl mx-auto p-4 pt-8 md:p-10 md:pt-12 flex-1 editor-enter">
-        {loadError ? <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl p-8 text-center"><div><h2 className="text-lg font-bold text-[#183b31]">Document unavailable</h2><p className="mt-2 max-w-sm text-sm leading-relaxed text-[#668077]">{loadError}</p><Link href="/" className="primary-action mt-6 inline-flex rounded-xl px-4 py-2.5 text-sm font-bold">Back to home</Link></div></div> : documentData ? <TipTapEditor
-          documentId={documentData.id}
-          currentUser={currentUser}
-          onPresenceUpdate={handlePresenceUpdate}
-        /> : <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl text-sm text-[#668077]">Loading document…</div>}
+        {loadError ? (
+          <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl p-8 text-center">
+            <div>
+              <h2 className="text-lg font-bold text-[#183b31]">Document unavailable</h2>
+              <p className="mt-2 max-w-sm text-sm leading-relaxed text-[#668077]">{loadError}</p>
+              <Link href="/" className="primary-action mt-6 inline-flex rounded-xl px-4 py-2.5 text-sm font-bold">Back to home</Link>
+            </div>
+          </div>
+        ) : documentData ? (
+          <TipTapEditor
+            ref={editorRef}
+            documentId={documentData.id}
+            currentUser={currentUser}
+            onPresenceUpdate={handlePresenceUpdate}
+          />
+        ) : (
+          <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl text-sm text-[#668077]">Loading document…</div>
+        )}
       </main>
 
       {/* Modals & Drawers */}
@@ -224,9 +251,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         documentId={documentData?.id || docId}
         versions={versions}
         currentContent={documentData?.content || ""}
-        onRestoreVersion={(content) => {
-          alert("Snapshot content restored!");
-        }}
+        onRestoreVersion={handleRestoreVersion}
         onSnapshotSaved={(v) => setVersions([v, ...versions])}
         currentUserName={currentUser.name}
       />
