@@ -1,0 +1,67 @@
+#yaml-language-server: $schema=https://api.app-prg1.zerops.io/api/rest/public/settings/import-project-yml-json-schema.json
+# ─────────────────────────────────────────────────────────────────────────────
+# Connect — Zerops project import
+#
+# How to use:
+#   1. Fill in the four <PASTE_…> placeholders below with your real secrets.
+#   2. In the Zerops dashboard → Projects → "Import a project" → paste this file.
+#   3. After deploy completes, enable subdomain access on both services
+#      (or add your own domain) and the app is live.
+#
+# Services created:
+#   • db          — PostgreSQL 16 (managed, private network)
+#   • api         — Node.js 22 backend (Express + Yjs WebSocket)
+#   • frontend    — Node.js 22 Next.js frontend (standalone)
+# ─────────────────────────────────────────────────────────────────────────────
+#yamlPreprocessor=on
+
+project:
+  name: connect
+  description: Real-time collaborative document editor
+  corePackage: LIGHT
+  tags:
+    - hackathon
+    - zerops
+
+services:
+  # ── PostgreSQL managed database ──────────────────────────────────────────
+  - hostname: db
+    type: postgresql@16
+    mode: NON_HA
+    priority: 10          # create DB first so the API can migrate on start
+
+  # ── Express + Yjs WebSocket backend ─────────────────────────────────────
+  - hostname: api
+    type: nodejs@22
+    enableSubdomainAccess: true
+    priority: 5
+    buildFromGit: https://github.com/harshqs/Connect
+    zeropsSetup: api
+    envSecrets:
+      # Zerops injects these from the db service automatically.
+      DATABASE_URL: ${db_connectionString}
+      # Google OAuth — paste your credentials here.
+      GOOGLE_CLIENT_ID: <PASTE_YOUR_GOOGLE_CLIENT_ID>
+      GOOGLE_CLIENT_SECRET: <PASTE_YOUR_GOOGLE_CLIENT_SECRET>
+      # After frontend is deployed, set this to its subdomain URL, e.g.:
+      #   https://frontend.<your-project>.zerops.app
+      # You can update it in the Zerops dashboard after the first deploy.
+      FRONTEND_URL: <PASTE_YOUR_FRONTEND_SUBDOMAIN_URL>
+      # This is set automatically by Zerops at runtime — listed here for clarity.
+      # GOOGLE_CALLBACK_URL is derived from the api subdomain URL:
+      #   https://api.<your-project>.zerops.app/api/auth/google/callback
+      GOOGLE_CALLBACK_URL: <PASTE_YOUR_API_SUBDOMAIN_URL>/api/auth/google/callback
+
+  # ── Next.js frontend ─────────────────────────────────────────────────────
+  - hostname: frontend
+    type: nodejs@22
+    enableSubdomainAccess: true
+    priority: 1
+    buildFromGit: https://github.com/harshqs/Connect
+    zeropsSetup: frontend
+    envSecrets:
+      # Point the browser at the api service subdomain.
+      # Format: https://api.<your-project>.zerops.app
+      NEXT_PUBLIC_API_URL: <PASTE_YOUR_API_SUBDOMAIN_URL>/api
+      # WebSocket uses the same host, wss scheme.
+      NEXT_PUBLIC_WS_URL: <PASTE_YOUR_API_SUBDOMAIN_WSS_URL>

@@ -1,50 +1,58 @@
-# Zerops Deployment Configuration for "Connect" Real-Time Notepad
-# Zerops Hackathon Ready Specification
-
-project:
-  name: connect-app
-
-services:
-  # Node.js WebSocket & REST API Backend Service
-  - hostname: connect-backend
-    type: nodejs@20
+zerops:
+  # ── Backend: Express REST API + Yjs WebSocket server ──────────────────────
+  - setup: api
     build:
-      base: nodejs@20
+      base: nodejs@22
       buildCommands:
-        - npm ci
+        - npm ci --include=dev
         - npx prisma generate
       deployFiles:
         - server/
-        - src/lib/
         - prisma/
+        - node_modules/
         - package.json
-        - package-lock.json
-        - tsconfig.json
     run:
-      base: nodejs@20
-      start: npm run server
-      ports:
-        - port: 1234
-          httpSupport: true
-
-  # Next.js Frontend Application Service
-  - hostname: connect-frontend
-    type: nodejs@20
-    build:
-      base: nodejs@20
-      buildCommands:
-        - npm ci
-        - npx prisma generate
-        - npm run build
-      deployFiles:
-        - .next/
-        - public/
-        - package.json
-        - package-lock.json
-        - next.config.ts
-    run:
-      base: nodejs@20
-      start: npm start
+      base: nodejs@22
       ports:
         - port: 3000
           httpSupport: true
+      envVariables:
+        PORT: 3000
+      initCommands:
+        # Run any pending DB migrations before the process starts.
+        # Safe to run on every deploy — already-applied migrations are skipped.
+        - npx prisma migrate deploy
+      start: node_modules/.bin/tsx server/index.ts
+      healthCheck:
+        httpGet:
+          port: 3000
+          path: /health
+
+  # ── Frontend: Next.js (standalone output) ─────────────────────────────────
+  - setup: frontend
+    build:
+      base: nodejs@22
+      buildCommands:
+        - npm ci --include=dev
+        - npx prisma generate
+        - npm run build
+      deployFiles:
+        # standalone bundle — includes server + required node_modules
+        - .next/standalone/
+        # static assets must be copied in alongside standalone
+        - .next/static/  => .next/standalone/.next/static/
+        - public/        => .next/standalone/public/
+    run:
+      base: nodejs@22
+      ports:
+        - port: 3000
+          httpSupport: true
+      envVariables:
+        PORT: 3000
+        NODE_ENV: production
+        HOSTNAME: 0.0.0.0
+      start: node .next/standalone/server.js
+      healthCheck:
+        httpGet:
+          port: 3000
+          path: /
