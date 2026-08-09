@@ -69,6 +69,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       color: currentUser.color,
       avatar: currentUser.avatar,
     });
+    // Explicitly clear any stale typing state from a previous session
+    awareness.setLocalStateField("isTyping", false);
 
     wsProvider.on("status", (event: { status: "connected" | "disconnected" | "connecting" }) => {
       const connected = event.status === "connected";
@@ -118,7 +120,19 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       indexeddbProvider.destroy();
       ydoc.destroy();
     };
-  }, [documentId, ydoc, currentUser, onPresenceUpdate]);
+  }, [documentId, ydoc, onPresenceUpdate]);
+
+  // Keep awareness user state in sync when currentUser changes (e.g. after login resolves)
+  // without destroying the WebSocket provider
+  useEffect(() => {
+    if (!provider) return;
+    provider.awareness.setLocalStateField("user", {
+      name: currentUser.name,
+      color: currentUser.color,
+      avatar: currentUser.avatar,
+    });
+    provider.awareness.setLocalStateField("isTyping", false);
+  }, [provider, currentUser]);
 
   // TipTap Editor instance
   const editor = useEditor({
