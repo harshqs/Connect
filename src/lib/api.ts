@@ -117,6 +117,8 @@ export async function updateProfile(data: { name?: string; color?: string; avata
   if (!res.ok) throw new Error("Failed to update profile");
   return res.json();
 }
+
+export async function createVersionSnapshot(docId: string, title: string, content: string, editedBy: string): Promise<DocumentVersion> {
   const res = await fetch(`${API_BASE}/documents/${docId}/versions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
