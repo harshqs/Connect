@@ -22,8 +22,6 @@ zerops:
           httpSupport: true
       envVariables:
         PORT: 3000
-      initCommands:
-        - node_modules/.bin/prisma migrate deploy
       start: node dist-server/server/index.js
       healthCheck:
         httpGet:

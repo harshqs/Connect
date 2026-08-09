@@ -10,6 +10,22 @@ import { encoding, decoding } from "lib0";
 import { randomBytes } from "crypto";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { execSync } from "child_process";
+
+// Run DB migrations on startup using the CLI bundled in node_modules.
+// This runs in the Node.js process where DATABASE_URL is available,
+// and uses the pre-generated Prisma binary that matches the build container.
+try {
+  console.log("Running database migrations...");
+  execSync("node node_modules/.bin/prisma migrate deploy", {
+    stdio: "inherit",
+    env: process.env,
+  });
+  console.log("Migrations complete.");
+} catch (err) {
+  // Log but don't crash — tables may already exist from a previous deploy.
+  console.warn("Migration warning (non-fatal):", err);
+}
 
 const prisma = new PrismaClient();
 const app = express();
