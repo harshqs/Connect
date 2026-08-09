@@ -10,6 +10,7 @@ interface CommentSidebarProps {
   documentId: string;
   comments: Comment[];
   onCommentAdded: (c: Comment) => void;
+  currentUserName?: string;
 }
 
 export const CommentSidebar: React.FC<CommentSidebarProps> = ({
@@ -18,6 +19,7 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({
   documentId,
   comments,
   onCommentAdded,
+  currentUserName = "Collaborator",
 }) => {
   const [commentText, setCommentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,7 +32,7 @@ export const CommentSidebar: React.FC<CommentSidebarProps> = ({
 
     try {
       setIsSubmitting(true);
-      const newComment = await addComment(documentId, commentText.trim(), "Anant");
+      const newComment = await addComment(documentId, commentText.trim(), currentUserName);
       onCommentAdded(newComment);
       setCommentText("");
     } catch (err) {

@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FileText, Globe2, LockKeyhole, Plus, Search, Trash2 } from "lucide-react";
-import { DocumentItem, createDocument, deleteDocument, fetchDocuments } from "@/lib/api";
+import { DocumentItem, createDocument, deleteDocument, fetchDocuments, fetchCurrentUser, googleSignInUrl } from "@/lib/api";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -14,9 +16,19 @@ export default function DashboardPage() {
   const loadDocuments = async () => {
     setLoading(true);
     setError("");
-    try { setDocuments(await fetchDocuments()); }
-    catch { setError("Your workspace could not be reached. Start the collaboration server, then try again."); }
-    finally { setLoading(false); }
+    try {
+      // Verify the user is signed in before loading documents
+      await fetchCurrentUser();
+      setDocuments(await fetchDocuments());
+    } catch (err: any) {
+      if (err?.message?.includes("401") || err?.message?.includes("Sign in")) {
+        window.location.assign(googleSignInUrl);
+        return;
+      }
+      setError("Your workspace could not be reached. Start the collaboration server, then try again.");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { loadDocuments(); }, []);
 

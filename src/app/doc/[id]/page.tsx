@@ -18,7 +18,7 @@ import { PresenceBar, ActiveUser } from "@/components/collaboration/PresenceBar"
 import { ShareModal } from "@/components/collaboration/ShareModal";
 import { VersionHistory } from "@/components/editor/VersionHistory";
 import { CommentSidebar } from "@/components/editor/CommentSidebar";
-import { DocumentItem, fetchDocumentById, updateDocument, Comment, DocumentVersion } from "@/lib/api";
+import { DocumentItem, fetchDocumentById, fetchCurrentUser, updateDocument, Comment, DocumentVersion } from "@/lib/api";
 
 export default function DocumentEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: docId } = use(params);
@@ -31,7 +31,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
   const [comments, setComments] = useState<Comment[]>([]);
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [loadError, setLoadError] = useState("");
-  const [currentUser, setCurrentUser] = useState({ name: "Guest", color: "#2b7c6a" });
+  const [currentUser, setCurrentUser] = useState<{ name: string; color: string; avatar?: string }>({ name: "Guest", color: "#2b7c6a" });
 
   // Modals & Drawers
   const [shareModalOpen, setShareModalOpen] = useState(false);
@@ -40,10 +40,21 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
   const [titleSaved, setTitleSaved] = useState(false);
 
   useEffect(() => {
-    const savedName = window.sessionStorage.getItem("connect-guest-name");
-    const name = savedName || `Guest ${Math.floor(100 + Math.random() * 900)}`;
-    window.sessionStorage.setItem("connect-guest-name", name);
-    setCurrentUser({ name, color: "#2b7c6a" });
+    // Try to load the signed-in user from the API; fall back to guest name
+    async function loadUser() {
+      try {
+        const user = await fetchCurrentUser();
+        setCurrentUser({ name: user.name, color: user.color, avatar: user.avatar });
+        window.sessionStorage.setItem("connect-guest-name", user.name);
+      } catch {
+        // Not signed in — use a persistent guest name
+        const savedName = window.sessionStorage.getItem("connect-guest-name");
+        const name = savedName || `Guest ${Math.floor(100 + Math.random() * 900)}`;
+        window.sessionStorage.setItem("connect-guest-name", name);
+        setCurrentUser({ name, color: "#2b7c6a" });
+      }
+    }
+    loadUser();
   }, []);
 
   const handlePresenceUpdate = useCallback((users: ActiveUser[], connected: boolean) => {
@@ -193,6 +204,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
           alert("Snapshot content restored!");
         }}
         onSnapshotSaved={(v) => setVersions([v, ...versions])}
+        currentUserName={currentUser.name}
       />
 
       <CommentSidebar
@@ -201,6 +213,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         documentId={documentData?.id || docId}
         comments={comments}
         onCommentAdded={(c) => setComments([c, ...comments])}
+        currentUserName={currentUser.name}
       />
     </div>
   );

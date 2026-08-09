@@ -1,7 +1,10 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:1234/api";
 export const googleSignInUrl = `${API_BASE}/auth/google`;
 export const getAuthToken = () => typeof window === "undefined" ? null : window.localStorage.getItem("connect-session");
-const authHeaders = () => getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {};
+const authHeaders = (): Record<string, string> => {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 export interface User {
   id: string;
@@ -52,7 +55,7 @@ export interface DocumentItem {
 
 export async function fetchCurrentUser(): Promise<User> {
   const res = await fetch(`${API_BASE}/auth/me`, { headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed to fetch user");
+  if (!res.ok) throw new Error(res.status === 401 ? "Sign in required" : "Failed to fetch user");
   return res.json();
 }
 

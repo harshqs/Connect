@@ -12,6 +12,7 @@ interface VersionHistoryProps {
   currentContent: string;
   onRestoreVersion: (content: string) => void;
   onSnapshotSaved: (v: DocumentVersion) => void;
+  currentUserName?: string;
 }
 
 export const VersionHistory: React.FC<VersionHistoryProps> = ({
@@ -22,6 +23,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
   currentContent,
   onRestoreVersion,
   onSnapshotSaved,
+  currentUserName = "Collaborator",
 }) => {
   const [saving, setSaving] = useState(false);
 
@@ -31,7 +33,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
     try {
       setSaving(true);
       const title = `Version ${versions.length + 1}`;
-      const newVersion = await createVersionSnapshot(documentId, title, currentContent, "Anant");
+      const newVersion = await createVersionSnapshot(documentId, title, currentContent, currentUserName);
       onSnapshotSaved(newVersion);
     } catch (err) {
       console.error("Failed to save snapshot", err);
