@@ -6,7 +6,6 @@ zerops:
       buildCommands:
         - npm ci --include=dev
         - npx prisma generate
-        - npx prisma migrate deploy
       deployFiles:
         - server/
         - prisma/
@@ -16,13 +15,19 @@ zerops:
         - node_modules
         - package-lock.json
     run:
-      base: nodejs@22
+      base: ubuntu@22.04
       ports:
         - port: 3000
           httpSupport: true
       envVariables:
         PORT: 3000
-      start: node_modules/.bin/tsx server/index.ts
+      prepareCommands:
+        - sudo apt-get update -y
+        - sudo apt-get install -y openssl
+        - npm install -g tsx
+      initCommands:
+        - npx prisma migrate deploy
+      start: tsx server/index.ts
       healthCheck:
         httpGet:
           port: 3000
