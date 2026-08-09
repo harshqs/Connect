@@ -10,6 +10,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^5.22.0",
     "@tailwindcss/postcss": "^4",
     "@tiptap/extension-character-count": "^3.29.2",
@@ -27,6 +28,7 @@
     "@types/express": "^5.0.6",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
+    "@types/pg": "^8.21.0",
     "@types/ws": "^8.18.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
@@ -37,6 +39,7 @@
     "next": "16.3.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "pg": "^8.23.0",
     "prisma": "^5.22.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",

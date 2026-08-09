@@ -3,6 +3,8 @@ import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
 import * as Y from "yjs";
 import * as syncProtocol from "y-protocols/sync";
 import * as awarenessProtocol from "y-protocols/awareness";
@@ -27,7 +29,11 @@ try {
   console.warn("Migration warning (non-fatal):", err);
 }
 
-const prisma = new PrismaClient();
+// Use pg driver adapter so Prisma needs no native OpenSSL binary at runtime
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter } as any);
+
 const app = express();
 const server = http.createServer(app);
 
