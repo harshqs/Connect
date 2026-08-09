@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "@tailwindcss/postcss": "^4",
     "@tiptap/extension-character-count": "^3.29.2",
     "@tiptap/extension-collaboration": "^3.29.2",
     "@tiptap/extension-collaboration-cursor": "^2.26.2",
@@ -36,6 +37,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4",
     "tsx": "^4.23.11",
     "ws": "^8.21.3",
     "y-indexeddb": "^9.0.12",
@@ -45,13 +47,11 @@
     "yjs": "^13.6.32"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
-    "tailwindcss": "^4",
     "typescript": "^5"
   }
 }
