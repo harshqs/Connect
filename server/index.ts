@@ -18,6 +18,10 @@ const PORT = process.env.PORT || 1234;
 app.use(cors());
 app.use(express.json());
 
+app.get("/health", (_req: Request, res: Response) => {
+  res.json({ ok: true, service: "connect-api" });
+});
+
 // In-Memory Documents Map for Yjs CRDT Sync
 interface Room {
   doc: Y.Doc;
