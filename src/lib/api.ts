@@ -1,4 +1,7 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:1234/api";
+export const googleSignInUrl = `${API_BASE}/auth/google`;
+export const getAuthToken = () => typeof window === "undefined" ? null : window.localStorage.getItem("connect-session");
+const authHeaders = () => getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {};
 
 export interface User {
   id: string;
@@ -48,13 +51,13 @@ export interface DocumentItem {
 }
 
 export async function fetchCurrentUser(): Promise<User> {
-  const res = await fetch(`${API_BASE}/users/me`);
+  const res = await fetch(`${API_BASE}/auth/me`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to fetch user");
   return res.json();
 }
 
 export async function fetchDocuments(): Promise<DocumentItem[]> {
-  const res = await fetch(`${API_BASE}/documents`);
+  const res = await fetch(`${API_BASE}/documents`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to fetch documents");
   return res.json();
 }
@@ -62,7 +65,7 @@ export async function fetchDocuments(): Promise<DocumentItem[]> {
 export async function createDocument(title?: string): Promise<DocumentItem> {
   const res = await fetch(`${API_BASE}/documents`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ title }),
   });
   if (!res.ok) throw new Error("Failed to create document");
@@ -70,7 +73,7 @@ export async function createDocument(title?: string): Promise<DocumentItem> {
 }
 
 export async function fetchDocumentById(id: string): Promise<DocumentItem> {
-  const res = await fetch(`${API_BASE}/documents/${id}`);
+  const res = await fetch(`${API_BASE}/documents/${id}`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to fetch document");
   return res.json();
 }
@@ -78,7 +81,7 @@ export async function fetchDocumentById(id: string): Promise<DocumentItem> {
 export async function updateDocument(id: string, data: { title?: string; isPublic?: boolean; content?: string }): Promise<DocumentItem> {
   const res = await fetch(`${API_BASE}/documents/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update document");

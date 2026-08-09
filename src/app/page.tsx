@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, FileText, Globe2, Radio, ShieldCheck, Users } from "lucide-react";
-import { createDocument } from "@/lib/api";
+import { createDocument, googleSignInUrl } from "@/lib/api";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -27,6 +27,7 @@ export default function LandingPage() {
           <span className="text-xl font-black tracking-[-.04em]">Connect</span>
         </Link>
         <div className="flex items-center gap-3">
+          <a href={googleSignInUrl} className="secondary-action rounded-xl px-4 py-2 text-sm font-semibold">Sign in with Google</a>
           <Link href="/dashboard" className="secondary-action rounded-xl px-4 py-2 text-sm font-semibold">Workspace</Link>
           <button onClick={handleCreateDocument} className="primary-action hidden rounded-xl px-4 py-2 text-sm font-bold sm:block">New note</button>
         </div>

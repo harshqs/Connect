@@ -8,6 +8,8 @@ import * as syncProtocol from "y-protocols/sync";
 import * as awarenessProtocol from "y-protocols/awareness";
 import { encoding, decoding } from "lib0";
 import { randomBytes } from "crypto";
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -17,6 +19,45 @@ const PORT = process.env.PORT || 1234;
 
 app.use(cors());
 app.use(express.json());
+
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID || "",
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:1234/api/auth/google/callback",
+}, async (_accessToken, _refreshToken, profile, done) => {
+  try {
+    const email = profile.emails?.[0]?.value;
+    if (!email) return done(new Error("Google did not provide an email address"));
+    const user = await prisma.user.upsert({
+      where: { googleId: profile.id },
+      update: { name: profile.displayName || email, email, avatar: profile.photos?.[0]?.value },
+      create: { googleId: profile.id, name: profile.displayName || email, email, avatar: profile.photos?.[0]?.value, color: "#2b7c6a" },
+    });
+    done(null, user);
+  } catch (error) { done(error as Error); }
+}));
+app.use(passport.initialize());
+
+const currentUser = async (req: Request) => {
+  const token = req.header("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  const session = await prisma.session.findUnique({ where: { token }, include: { user: true } });
+  if (!session || session.expiresAt < new Date()) return null;
+  return session.user;
+};
+
+app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"], session: false }));
+app.get("/api/auth/google/callback", passport.authenticate("google", { session: false, failureRedirect: `${process.env.FRONTEND_URL || "http://localhost:3000"}/?auth=failed` }), async (req: Request, res: Response) => {
+  const user = req.user as { id: string };
+  const token = randomBytes(32).toString("base64url");
+  await prisma.session.create({ data: { token, userId: user.id, expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) } });
+  res.redirect(`${process.env.FRONTEND_URL || "http://localhost:3000"}/auth/callback?token=${token}`);
+});
+app.get("/api/auth/me", async (req: Request, res: Response) => {
+  const user = await currentUser(req);
+  if (!user) return res.status(401).json({ error: "Sign in required" });
+  res.json(user);
+});
 
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, service: "connect-api" });
@@ -213,7 +254,8 @@ app.get("/api/users/me", async (req: Request, res: Response) => {
 // 2. List all documents for user
 app.get("/api/documents", async (req: Request, res: Response) => {
   try {
-    const user = await getOrCreateDefaultUser();
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: "Sign in required" });
     const documents = await prisma.document.findMany({
       where: {
         OR: [
@@ -239,7 +281,8 @@ app.get("/api/documents", async (req: Request, res: Response) => {
 app.post("/api/documents", async (req: Request, res: Response) => {
   try {
     const { title = "Untitled Document" } = req.body;
-    const user = await getOrCreateDefaultUser();
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: "Sign in required" });
 
     const doc = await prisma.document.create({
       data: {

@@ -12,6 +12,7 @@ model User {
   id        String   @id @default(uuid())
   name      String
   email     String   @unique
+  googleId  String?  @unique
   avatar    String?
   color     String   @default("#6366f1")
   createdAt DateTime @default(now())
@@ -20,6 +21,17 @@ model User {
   ownedDocuments Document[]       @relation("DocumentOwner")
   memberships    DocumentMember[]
   comments       Comment[]
+  sessions       Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Document {
