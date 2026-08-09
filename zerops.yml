@@ -6,6 +6,7 @@ zerops:
       buildCommands:
         - npm ci --include=dev
         - npx prisma generate
+        - npx prisma migrate deploy
       deployFiles:
         - server/
         - prisma/
@@ -21,8 +22,6 @@ zerops:
           httpSupport: true
       envVariables:
         PORT: 3000
-      initCommands:
-        - npx prisma migrate deploy
       start: node_modules/.bin/tsx server/index.ts
       healthCheck:
         httpGet:
