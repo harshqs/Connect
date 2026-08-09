@@ -70,25 +70,19 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       avatar: currentUser.avatar,
     });
 
-    const updateTypingNames = () => {
-      const names: string[] = [];
-      awareness.getStates().forEach((state: any) => {
-        if (state.isTyping && state.user?.name && state.user.name !== currentUser.name) names.push(state.user.name);
-      });
-      setTypingNames(names);
-    };
-
     wsProvider.on("status", (event: { status: "connected" | "disconnected" | "connecting" }) => {
       const connected = event.status === "connected";
       setIsConnected(connected);
     });
 
-    // Listen to awareness changes
+    // Listen to awareness changes — always exclude own clientID so self never
+    // appears as "someone else typing" on your own screen.
     const updateAwareness = () => {
-      const states = awareness.getStates();
+      const localClientID = awareness.clientID;
       const activeUsers: ActiveUser[] = [];
 
-      states.forEach((state: any, clientID: number) => {
+      awareness.getStates().forEach((state: any, clientID: number) => {
+        if (clientID === localClientID) return; // skip self
         if (state.user) {
           activeUsers.push({
             id: String(clientID),
@@ -101,6 +95,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       });
 
       onPresenceUpdate(activeUsers, wsProvider.wsconnected);
+    };
+
+    const updateTypingNames = () => {
+      const localClientID = awareness.clientID;
+      const names: string[] = [];
+      awareness.getStates().forEach((state: any, clientID: number) => {
+        if (clientID === localClientID) return; // skip self
+        if (state.isTyping && state.user?.name) names.push(state.user.name);
+      });
+      setTypingNames(names);
     };
 
     awareness.on("change", updateAwareness);
