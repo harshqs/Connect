@@ -489,7 +489,8 @@ app.patch("/api/folders/:id", async (req: Request, res: Response) => {
     const user = await currentUser(req);
     if (!user) return res.status(401).json({ error: "Sign in required" });
 
-    const folder = await prisma.folder.findUnique({ where: { id: req.params.id } });
+    const folderId = req.params.id as string;
+    const folder = await prisma.folder.findUnique({ where: { id: folderId } });
     if (!folder || folder.ownerId !== user.id) {
       return res.status(403).json({ error: "You do not have permission to rename this folder" });
     }
@@ -498,7 +499,7 @@ app.patch("/api/folders/:id", async (req: Request, res: Response) => {
     if (!name?.trim()) return res.status(400).json({ error: "Folder name is required" });
 
     const updated = await prisma.folder.update({
-      where: { id: req.params.id },
+      where: { id: folderId },
       data: { name: String(name).slice(0, 64) },
       include: { _count: { select: { documents: true } } },
     });
@@ -514,12 +515,13 @@ app.delete("/api/folders/:id", async (req: Request, res: Response) => {
     const user = await currentUser(req);
     if (!user) return res.status(401).json({ error: "Sign in required" });
 
-    const folder = await prisma.folder.findUnique({ where: { id: req.params.id } });
+    const folderId = req.params.id as string;
+    const folder = await prisma.folder.findUnique({ where: { id: folderId } });
     if (!folder || folder.ownerId !== user.id) {
       return res.status(403).json({ error: "You do not have permission to delete this folder" });
     }
 
-    await prisma.folder.delete({ where: { id: req.params.id } });
+    await prisma.folder.delete({ where: { id: folderId } });
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
