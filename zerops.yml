@@ -3,8 +3,6 @@ zerops:
   - setup: api
     build:
       base: nodejs@22
-      prepareCommands:
-        - apk add --no-cache openssl
       buildCommands:
         - npm ci --include=dev
         - npx prisma generate
@@ -23,8 +21,6 @@ zerops:
           httpSupport: true
       envVariables:
         PORT: 3000
-      prepareCommands:
-        - apk add --no-cache openssl
       initCommands:
         - npx prisma migrate deploy
       start: node_modules/.bin/tsx server/index.ts
