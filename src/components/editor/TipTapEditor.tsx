@@ -50,7 +50,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   const [isConnected, setIsConnected] = useState(false);
   const [typingNames, setTypingNames] = useState<string[]>([]);
 
-  // Initialize Yjs Document and WebSocket Provider
+  // Stable session ID for this browser tab — never changes, used to filter self from awareness
+  const sessionId = useMemo(() => Math.random().toString(36).slice(2), []);
+
+  // Yjs document
   const ydoc = useMemo(() => new Y.Doc(), [documentId]);
 
   useEffect(() => {
@@ -68,6 +71,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       name: currentUser.name,
       color: currentUser.color,
       avatar: currentUser.avatar,
+      sessionId,  // unique per browser tab, used to filter self
     });
     // Explicitly clear any stale typing state from a previous session
     awareness.setLocalStateField("isTyping", false);
@@ -77,17 +81,14 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       setIsConnected(connected);
     });
 
-    // Listen to awareness changes — always exclude own clientID so self never
-    // appears as "someone else typing" on your own screen.
+    // Listen to awareness changes — skip entries with our own sessionId
     const updateAwareness = () => {
-      const localClientID = awareness.clientID;
       const activeUsers: ActiveUser[] = [];
-
-      awareness.getStates().forEach((state: any, clientID: number) => {
-        if (clientID === localClientID) return; // skip self
+      awareness.getStates().forEach((state: any) => {
+        if (state.user?.sessionId === sessionId) return; // skip self
         if (state.user) {
           activeUsers.push({
-            id: String(clientID),
+            id: state.user.sessionId || String(Math.random()),
             name: state.user.name || "Collaborator",
             color: state.user.color || "#6366f1",
             avatar: state.user.avatar,
@@ -95,15 +96,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           });
         }
       });
-
       onPresenceUpdate(activeUsers, wsProvider.wsconnected);
     };
 
     const updateTypingNames = () => {
-      const localClientID = awareness.clientID;
       const names: string[] = [];
-      awareness.getStates().forEach((state: any, clientID: number) => {
-        if (clientID === localClientID) return; // skip self
+      awareness.getStates().forEach((state: any) => {
+        if (state.user?.sessionId === sessionId) return; // skip self
         if (state.isTyping && state.user?.name) names.push(state.user.name);
       });
       setTypingNames(names);
@@ -123,16 +122,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   }, [documentId, ydoc, onPresenceUpdate]);
 
   // Keep awareness user state in sync when currentUser changes (e.g. after login resolves)
-  // without destroying the WebSocket provider
   useEffect(() => {
     if (!provider) return;
     provider.awareness.setLocalStateField("user", {
       name: currentUser.name,
       color: currentUser.color,
       avatar: currentUser.avatar,
+      sessionId,
     });
     provider.awareness.setLocalStateField("isTyping", false);
-  }, [provider, currentUser]);
+  }, [provider, currentUser, sessionId]);
 
   // TipTap Editor instance
   const editor = useEditor({
