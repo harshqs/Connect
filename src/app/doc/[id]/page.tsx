@@ -11,7 +11,6 @@ import {
   Lock,
   Globe,
   Check,
-  UserRound,
 } from "lucide-react";
 import { TipTapEditor } from "@/components/editor/TipTapEditor";
 import { PresenceBar, ActiveUser } from "@/components/collaboration/PresenceBar";
@@ -139,7 +138,32 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         {/* Center: Live Presence Bar */}
         <div className="flex items-center gap-3">
           <PresenceBar users={activeUsers} isConnected={isConnected} currentUser={currentUser} />
-          <button onClick={changeDisplayName} className="hidden items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-semibold text-[#466259] transition hover:bg-[#edf5ef] sm:flex" title="Change your display name"><UserRound className="size-3.5" />{currentUser.name}</button>
+          {/* Current user's own avatar — click to change display name */}
+          <button
+            onClick={changeDisplayName}
+            title={`You: ${currentUser.name} — click to rename`}
+            className="relative group hidden sm:block flex-shrink-0"
+          >
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white ring-2 ring-white shadow-sm transition group-hover:scale-110"
+              style={{ backgroundColor: currentUser.color || "#2b7c6a" }}
+            >
+              {currentUser.avatar ? (
+                <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full rounded-full object-cover" />
+              ) : (
+                currentUser.name ? currentUser.name.charAt(0).toUpperCase() : "?"
+              )}
+            </div>
+            {/* Tooltip */}
+            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+              <div className="whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold text-white shadow-lg" style={{ backgroundColor: currentUser.color || "#2b7c6a" }}>
+                {currentUser.name} (you)
+              </div>
+              <div className="mx-auto mt-0.5 w-2 h-1 overflow-hidden flex justify-center">
+                <div className="w-2 h-2 rotate-45 -translate-y-1" style={{ backgroundColor: currentUser.color || "#2b7c6a" }} />
+              </div>
+            </div>
+          </button>
         </div>
 
         {/* Right: Actions (Share, History, Comments) */}
