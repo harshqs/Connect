@@ -10,9 +10,7 @@ import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import CharacterCount from "@tiptap/extension-character-count";
 import Link from "@tiptap/extension-link";
-import TextStyle from "@tiptap/extension-text-style";
-import FontFamily from "@tiptap/extension-font-family";
-import Color from "@tiptap/extension-color";
+import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { IndexeddbPersistence } from "y-indexeddb";
@@ -149,6 +147,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         Link.configure({ openOnClick: false }),
         TextStyle,
         FontFamily.configure({ types: ["textStyle"] }),
+        FontSize.configure({ types: ["textStyle"] }),
         Color.configure({ types: ["textStyle"] }),
         Collaboration.configure({ document: ydoc }),
         provider
@@ -242,7 +241,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
                 value={fontSize}
                 onChange={(event) => {
                   setFontSize(event.target.value);
-                  editor.chain().focus().setMark("textStyle", { "font-size": event.target.value }).run();
+                  editor.chain().focus().setFontSize(event.target.value).run();
                 }}
                 className="h-8 rounded-lg border border-[#dce8df] bg-white px-2 text-xs font-semibold text-[#466259] outline-none focus:border-[#4db59d]"
               >
