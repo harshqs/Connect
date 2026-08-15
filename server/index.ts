@@ -130,7 +130,6 @@ app.post("/api/documents/:id/research", async (req: Request, res: Response) => {
       const response = await client.chat.completions.create({
         model: process.env.GROQ_MODEL || "groq/compound",
         messages: [{ role: "user", content: `Research this question for a collaborative document: ${question}\n\nGive a concise, neutral answer and use web search for current facts.` }],
-        citation_options: "enabled",
       } as any);
       const message = response.choices[0]?.message as any;
       answer = message?.content || "No research answer was returned.";
