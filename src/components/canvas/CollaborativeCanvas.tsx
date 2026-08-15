@@ -5,12 +5,13 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { Download, Copy, Trash2 } from "lucide-react";
 
-type ShapeType = "select" | "rectangle" | "ellipse" | "diamond" | "arrow" | "line" | "freehand" | "text" | "start" | "process" | "decision" | "input" | "end";
-type Shape = { id: string; type: Exclude<ShapeType, "select">; x: number; y: number; width: number; height: number; text?: string; points?: string; color?: string };
+type ShapeType = "select" | "eraser" | "rectangle" | "ellipse" | "diamond" | "arrow" | "line" | "freehand" | "text" | "start" | "process" | "decision" | "input" | "end";
+type DrawableType = Exclude<ShapeType, "select" | "eraser">;
+type Shape = { id: string; type: DrawableType; x: number; y: number; width: number; height: number; text?: string; points?: string; color?: string };
 type User = { name: string; color: string; avatar?: string };
 const W = 1200, H = 720;
-const tools: Array<[ShapeType, string]> = [["select", "Select"], ["rectangle", "Rectangle"], ["ellipse", "Ellipse"], ["diamond", "Diamond"], ["arrow", "Arrow"], ["line", "Line"], ["freehand", "Draw"], ["text", "Text"]];
-const flowTools: Array<[Exclude<ShapeType, "select">, string]> = [["start", "Start"], ["process", "Process"], ["decision", "Decision"], ["input", "Input / Output"], ["end", "End"]];
+const tools: Array<[ShapeType, string]> = [["select", "Select"], ["rectangle", "Rectangle"], ["ellipse", "Ellipse"], ["diamond", "Diamond"], ["arrow", "Arrow"], ["line", "Line"], ["freehand", "Draw"], ["text", "Text"], ["eraser", "Eraser"]];
+const flowTools: Array<[DrawableType, string]> = [["start", "Start"], ["process", "Process"], ["decision", "Decision"], ["input", "Input / Output"], ["end", "End"]];
 
 function sessionFor(documentId: string) {
   const key = `connect-session:${documentId}`;
@@ -27,6 +28,7 @@ export function CollaborativeCanvas({ documentId, currentUser }: { documentId: s
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [remoteCursors, setRemoteCursors] = useState<Array<{ id: number; name: string; color: string; x: number; y: number }>>([]);
   const [drawing, setDrawing] = useState<{ x: number; y: number }[] | null>(null);
+  const [draft, setDraft] = useState<{ type: DrawableType; start: { x: number; y: number }; end: { x: number; y: number } } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
   const sessionRef = useRef<string | null>(null);
@@ -59,10 +61,15 @@ export function CollaborativeCanvas({ documentId, currentUser }: { documentId: s
   };
   const put = (shape: Shape) => ydoc.transact(() => map().set(shape.id, shape));
   const selected = shapes.find((shape) => shape.id === selectedId);
-  const addNode = (type: Exclude<ShapeType, "select">, x = 130 + (shapes.length % 4) * 230, y = 110 + (Math.floor(shapes.length / 4) % 3) * 170) => {
-    const text = type === "text" ? window.prompt("Text", "New text") || "Text" : type === "start" ? "Start" : type === "end" ? "End" : type === "process" ? "Process" : type === "decision" ? "Decision?" : type === "input" ? "Input / Output" : "";
-    const isLine = type === "arrow" || type === "line";
-    const next: Shape = { id: crypto.randomUUID(), type, x, y, width: isLine ? 170 : 160, height: isLine ? 0 : type === "text" ? 32 : 80, text, color: "#1e6b58" };
+  const makeShape = (type: DrawableType, start: { x: number; y: number }, end: { x: number; y: number }, id = crypto.randomUUID()): Shape => {
+    const line = type === "arrow" || type === "line";
+    const x = line ? start.x : Math.min(start.x, end.x), y = line ? start.y : Math.min(start.y, end.y);
+    const width = line ? end.x - start.x : Math.abs(end.x - start.x), height = line ? end.y - start.y : Math.abs(end.y - start.y);
+    const text = id === "draft" ? "" : type === "text" ? window.prompt("Text", "New text") || "Text" : type === "start" ? "Start" : type === "end" ? "End" : type === "process" ? "Process" : type === "decision" ? "Decision?" : type === "input" ? "Input / Output" : "";
+    return { id, type, x, y, width, height, text, color: "#1e6b58" };
+  };
+  const addNode = (type: DrawableType, start: { x: number; y: number }, end: { x: number; y: number }) => {
+    const next = makeShape(type, start, end);
     put(next);
     if (["start", "process", "decision", "input", "end"].includes(type) && selected && selected.type !== "arrow" && selected.type !== "line") {
       put({ id: crypto.randomUUID(), type: "arrow", x: selected.x + selected.width, y: selected.y + selected.height / 2, width: next.x - (selected.x + selected.width), height: next.y + next.height / 2 - (selected.y + selected.height / 2), text: "" });
@@ -72,22 +79,24 @@ export function CollaborativeCanvas({ documentId, currentUser }: { documentId: s
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     const target = (event.target as Element).closest("[data-shape-id]");
     const p = point(event);
+    if (tool === "eraser" && target) { map().delete(target.getAttribute("data-shape-id")!); setSelectedId(null); return; }
     if (tool === "select" && target) {
       const id = target.getAttribute("data-shape-id")!; const shape = shapes.find((item) => item.id === id);
       if (shape) { setSelectedId(id); dragRef.current = { id, dx: p.x - shape.x, dy: p.y - shape.y }; svgRef.current?.setPointerCapture(event.pointerId); }
       return;
     }
     if (tool === "freehand") { setDrawing([p]); svgRef.current?.setPointerCapture(event.pointerId); return; }
-    if (tool !== "select") addNode(tool, p.x, p.y);
+    if (tool !== "select" && tool !== "eraser") { setDraft({ type: tool, start: p, end: p }); svgRef.current?.setPointerCapture(event.pointerId); }
     else setSelectedId(null);
   };
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const p = point(event);
     provider?.awareness.setLocalStateField("canvasCursor", p);
     if (drawing) { setDrawing([...drawing, p]); return; }
+    if (draft) { setDraft({ ...draft, end: p }); return; }
     if (dragRef.current) { const shape = shapes.find((item) => item.id === dragRef.current!.id); if (shape) put({ ...shape, x: p.x - dragRef.current.dx, y: p.y - dragRef.current.dy }); }
   };
-  const onPointerUp = () => { if (drawing && drawing.length > 1) { const xs = drawing.map((p) => p.x), ys = drawing.map((p) => p.y); put({ id: crypto.randomUUID(), type: "freehand", x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys), points: drawing.map((p) => `${p.x},${p.y}`).join(" ") }); } setDrawing(null); dragRef.current = null; };
+  const onPointerUp = () => { if (drawing && drawing.length > 1) { const xs = drawing.map((p) => p.x), ys = drawing.map((p) => p.y); put({ id: crypto.randomUUID(), type: "freehand", x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys), points: drawing.map((p) => `${p.x},${p.y}`).join(" ") }); } if (draft && Math.hypot(draft.end.x - draft.start.x, draft.end.y - draft.start.y) > 8) addNode(draft.type, draft.start, draft.end); setDrawing(null); setDraft(null); dragRef.current = null; };
   const updateSelected = (partial: Partial<Shape>) => selected && put({ ...selected, ...partial });
   const removeSelected = () => { if (selectedId) { map().delete(selectedId); setSelectedId(null); } };
   const duplicateSelected = () => selected && put({ ...selected, id: crypto.randomUUID(), x: selected.x + 24, y: selected.y + 24 });
@@ -102,5 +111,5 @@ export function CollaborativeCanvas({ documentId, currentUser }: { documentId: s
     if (shape.type === "text") return <text key={shape.id} data-shape-id={shape.id} x={shape.x} y={shape.y + 22} fontSize="18" fill="#183b31">{shape.text}</text>;
     return <g key={shape.id} data-shape-id={shape.id}><rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="10" {...common} />{label}</g>;
   };
-  return <div className="editor-canvas overflow-hidden rounded-2xl"><div className="flex flex-wrap items-center gap-2 border-b border-[#e6ebe4] bg-[#fbfcf9] p-3"><div className="flex flex-wrap gap-1">{tools.map(([id, label]) => <button key={id} onClick={() => setTool(id)} className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${tool === id ? "bg-[#287d67] text-white" : "text-[#466259] hover:bg-[#e7f2eb]"}`}>{label}</button>)}</div><span className="h-6 w-px bg-[#dce8df]" /><div className="flex flex-wrap gap-1">{flowTools.map(([id, label]) => <button key={id} onClick={() => addNode(id)} className="rounded-lg border border-[#dce8df] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#466259] hover:border-[#4db59d]">{label}</button>)}</div><button onClick={loadTemplate} className="ml-auto rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#287d67] hover:bg-[#e7f2eb]">Flow template</button><button onClick={exportPng} className="flex items-center gap-1 rounded-lg bg-[#287d67] px-2.5 py-1.5 text-xs font-bold text-white"><Download className="size-3.5" /> PNG</button></div>{selected && <div className="flex flex-wrap items-center gap-3 border-b border-[#e6ebe4] bg-white px-4 py-2 text-xs text-[#466259]"><span className="font-bold text-[#183b31]">Selected {selected.type}</span><label>W <input type="number" value={Math.round(selected.width)} onChange={(e) => updateSelected({ width: Math.max(20, Number(e.target.value)) })} className="ml-1 w-16 rounded border border-[#dce8df] px-1 py-0.5" /></label><label>H <input type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Math.max(0, Number(e.target.value)) })} className="ml-1 w-16 rounded border border-[#dce8df] px-1 py-0.5" /></label>{(selected.type === "arrow" || selected.type === "line") && <label>Label <input value={selected.text || ""} onChange={(e) => updateSelected({ text: e.target.value })} className="ml-1 rounded border border-[#dce8df] px-1 py-0.5" /></label>}<button onClick={duplicateSelected} className="flex items-center gap-1 font-semibold text-[#287d67]"><Copy className="size-3.5" /> Duplicate</button><button onClick={removeSelected} className="flex items-center gap-1 font-semibold text-rose-600"><Trash2 className="size-3.5" /> Delete</button></div>}<div className="overflow-auto bg-[#eef4ef] p-4"><svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="min-w-[800px] w-full rounded-xl bg-white shadow-inner touch-none" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={() => provider?.awareness.setLocalStateField("canvasCursor", null)}><defs><marker id="canvas-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#1e6b58" /></marker><pattern id="canvas-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" fill="none" stroke="#e5eee8" strokeWidth="1" /></pattern></defs><rect width={W} height={H} fill="url(#canvas-grid)" />{shapes.map(renderShape)}{drawing && <polyline points={drawing.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#1e6b58" strokeWidth="3" />}{remoteCursors.map((cursor) => <g key={cursor.id} transform={`translate(${cursor.x} ${cursor.y})`} pointerEvents="none"><path d="M0 0 L0 18 L5 13 L10 22 L14 20 L9 11 L16 11 Z" fill={cursor.color} /><text x="12" y="-4" fontSize="12" fontWeight="700" fill={cursor.color}>{cursor.name}</text></g>)}</svg></div></div>;
+  return <div className="editor-canvas overflow-hidden rounded-2xl"><div className="flex flex-wrap items-center gap-2 border-b border-[#e6ebe4] bg-[#fbfcf9] p-3"><div className="flex flex-wrap gap-1">{tools.map(([id, label]) => <button key={id} onClick={() => setTool(id)} className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${tool === id ? "bg-[#287d67] text-white" : "text-[#466259] hover:bg-[#e7f2eb]"}`}>{label}</button>)}</div><span className="h-6 w-px bg-[#dce8df]" /><div className="flex flex-wrap gap-1">{flowTools.map(([id, label]) => <button key={id} onClick={() => setTool(id)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${tool === id ? "border-[#287d67] bg-[#e7f2eb] text-[#1d6954]" : "border-[#dce8df] bg-white text-[#466259]"}`}>{label}</button>)}</div><span className="text-[11px] text-[#668077]">Choose a tool, then drag on the canvas.</span><button onClick={loadTemplate} className="ml-auto rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#287d67] hover:bg-[#e7f2eb]">Flow template</button><button onClick={exportPng} className="flex items-center gap-1 rounded-lg bg-[#287d67] px-2.5 py-1.5 text-xs font-bold text-white"><Download className="size-3.5" /> PNG</button></div>{selected && <div className="flex flex-wrap items-center gap-3 border-b border-[#e6ebe4] bg-white px-4 py-2 text-xs text-[#466259]"><span className="font-bold text-[#183b31]">Selected {selected.type}</span><label>W <input type="number" value={Math.round(selected.width)} onChange={(e) => updateSelected({ width: Math.max(20, Number(e.target.value)) })} className="ml-1 w-16 rounded border border-[#dce8df] px-1 py-0.5" /></label><label>H <input type="number" value={Math.round(selected.height)} onChange={(e) => updateSelected({ height: Math.max(0, Number(e.target.value)) })} className="ml-1 w-16 rounded border border-[#dce8df] px-1 py-0.5" /></label>{(selected.type === "arrow" || selected.type === "line") && <label>Label <input value={selected.text || ""} onChange={(e) => updateSelected({ text: e.target.value })} className="ml-1 rounded border border-[#dce8df] px-1 py-0.5" /></label>}<button onClick={duplicateSelected} className="flex items-center gap-1 font-semibold text-[#287d67]"><Copy className="size-3.5" /> Duplicate</button><button onClick={removeSelected} className="flex items-center gap-1 font-semibold text-rose-600"><Trash2 className="size-3.5" /> Delete</button></div>}<div className="overflow-auto bg-[#eef4ef] p-4"><svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="min-w-[800px] w-full rounded-xl bg-white shadow-inner touch-none" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={() => provider?.awareness.setLocalStateField("canvasCursor", null)}><defs><marker id="canvas-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#1e6b58" /></marker><pattern id="canvas-grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M 24 0 L 0 0 0 24" fill="none" stroke="#e5eee8" strokeWidth="1" /></pattern></defs><rect width={W} height={H} fill="url(#canvas-grid)" />{shapes.map(renderShape)}{draft && renderShape(makeShape(draft.type, draft.start, draft.end, "draft"))}{drawing && <polyline points={drawing.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#1e6b58" strokeWidth="3" />}{remoteCursors.map((cursor) => <g key={cursor.id} transform={`translate(${cursor.x} ${cursor.y})`} pointerEvents="none"><path d="M0 0 L0 18 L5 13 L10 22 L14 20 L9 11 L16 11 Z" fill={cursor.color} /><text x="12" y="-4" fontSize="12" fontWeight="700" fill={cursor.color}>{cursor.name}</text></g>)}</svg></div></div>;
 }
