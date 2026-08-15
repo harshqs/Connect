@@ -10,6 +10,7 @@ import { encoding, decoding } from "lib0";
 import { randomBytes } from "crypto";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import OpenAI from "openai";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -110,6 +111,39 @@ app.patch("/api/auth/profile", async (req: Request, res: Response) => {
 
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true, service: "connect-api" });
+});
+
+app.post("/api/documents/:id/research", async (req: Request, res: Response) => {
+  const access = await authorizeDocAccess(req, res, req.params.id as string, ["owner", "editor"]);
+  if (!access) return;
+
+  const question = String(req.body?.question || "").trim().slice(0, 2000);
+  if (!question) return res.status(400).json({ error: "Ask a research question first" });
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Research is not configured. Add OPENAI_API_KEY in Render." });
+
+  try {
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const response = await client.responses.create({
+      model: process.env.OPENAI_MODEL || "gpt-5",
+      tools: [{ type: "web_search" }],
+      store: false,
+      input: `Research this question for a collaborative document: ${question}\n\nGive a concise, neutral answer in Markdown. Make claims only when supported by the web sources.`,
+    } as any);
+    const sources: Array<{ title: string; url: string }> = [];
+    for (const item of (response as any).output || []) {
+      for (const content of item.content || []) {
+        for (const annotation of content.annotations || []) {
+          if (annotation.type === "url_citation" && annotation.url && !sources.some((source) => source.url === annotation.url)) {
+            sources.push({ title: annotation.title || new URL(annotation.url).hostname, url: annotation.url });
+          }
+        }
+      }
+    }
+    res.json({ answer: response.output_text, sources });
+  } catch (error) {
+    console.error("Research error:", error);
+    res.status(502).json({ error: "Research could not be completed. Check the OpenAI key and billing." });
+  }
 });
 
 // ????????? Yjs / WebSocket real-time collaboration ??????????????????????????????????????????????????????????????????????????????????????????????????????

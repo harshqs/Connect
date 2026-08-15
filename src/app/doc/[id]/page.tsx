@@ -11,6 +11,7 @@ import {
   Check,
   PenTool,
   FileText as DocumentIcon,
+  Search,
 } from "lucide-react";
 import { TipTapEditor, TipTapEditorHandle } from "@/components/editor/TipTapEditor";
 import { PresenceBar, ActiveUser } from "@/components/collaboration/PresenceBar";
@@ -18,6 +19,7 @@ import { ShareModal } from "@/components/collaboration/ShareModal";
 import { VersionHistory } from "@/components/editor/VersionHistory";
 import { CommentSidebar } from "@/components/editor/CommentSidebar";
 import { CollaborativeCanvas } from "@/components/canvas/CollaborativeCanvas";
+import { ResearchPanel } from "@/components/research/ResearchPanel";
 import {
   DocumentItem, fetchDocumentById, fetchCurrentUser,
   updateDocument, Comment, DocumentVersion,
@@ -45,6 +47,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [titleSaved, setTitleSaved] = useState(false);
   const [workspace, setWorkspace] = useState<"document" | "canvas">("document");
+  const [researchOpen, setResearchOpen] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
@@ -187,6 +190,14 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setResearchOpen(true)}
+            className="flex items-center gap-2 rounded-xl border border-[#dfe5de] bg-white px-3 py-2.5 text-xs font-bold text-[#287d67] shadow-sm transition hover:bg-[#edf5ef]"
+            title="Research with AI"
+          >
+            <Search className="w-4 h-4" />
+            <span className="hidden md:inline">Research</span>
+          </button>
+          <button
             onClick={() => setCommentsOpen(!commentsOpen)}
             className="relative p-2.5 rounded-xl bg-white hover:bg-[#edf5ef] text-[#466259] transition border border-[#dfe5de] shadow-sm"
             title="Comments"
@@ -276,6 +287,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         onCommentAdded={(c) => setComments([c, ...comments])}
         currentUserName={currentUser.name}
       />
+      {researchOpen && documentData && <ResearchPanel documentId={documentData.id} onClose={() => setResearchOpen(false)} />}
     </div>
   );
 }

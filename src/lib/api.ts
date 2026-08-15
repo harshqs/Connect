@@ -132,6 +132,22 @@ export async function updateProfile(data: { name?: string; color?: string; avata
   return res.json();
 }
 
+export interface ResearchResult {
+  answer: string;
+  sources: Array<{ title: string; url: string }>;
+}
+
+export async function researchDocument(documentId: string, question: string): Promise<ResearchResult> {
+  const res = await fetch(`${API_BASE}/documents/${documentId}/research`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ question }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || "Research request failed");
+  return body;
+}
+
 export async function createVersionSnapshot(docId: string, title: string, content: string): Promise<DocumentVersion> {
   const res = await fetch(`${API_BASE}/documents/${docId}/versions`, {
     method: "POST",

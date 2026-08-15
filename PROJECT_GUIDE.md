@@ -105,6 +105,9 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_CALLBACK_URL=https://connect-y61u.onrender.com/api/auth/google/callback
 FRONTEND_URL=https://connect-seven-ecru.vercel.app
+OPENAI_API_KEY=...                  (keep private; required for AI Research)
+# Optional: defaults to gpt-5
+OPENAI_MODEL=gpt-5
 ```
 
 ### Vercel (frontend) — set in Vercel dashboard

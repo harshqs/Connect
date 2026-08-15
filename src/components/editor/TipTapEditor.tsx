@@ -11,6 +11,7 @@ import Highlight from "@tiptap/extension-highlight";
 import CharacterCount from "@tiptap/extension-character-count";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
+import TextAlign from "@tiptap/extension-text-align";
 import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
@@ -30,6 +31,9 @@ import {
   Undo,
   Redo,
   ImageUp,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from "lucide-react";
 import { ActiveUser } from "@/components/collaboration/PresenceBar";
 
@@ -158,6 +162,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         FontFamily.configure({ types: ["textStyle"] }),
         FontSize.configure({ types: ["textStyle"] }),
         Color.configure({ types: ["textStyle"] }),
+        TextAlign.configure({ types: ["heading", "paragraph"] }),
         Image.configure({
           allowBase64: false,
           HTMLAttributes: { class: "editor-image" },
@@ -338,6 +343,10 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
                 <span className="size-3 rounded-full bg-[#287d67]" />
                 <input aria-label="Text color" type="color" value={editor.getAttributes("textStyle").color || "#287d67"} onChange={(event) => editor.chain().focus().setColor(event.target.value).run()} className="sr-only" />
               </label>
+              <button onClick={() => editor.chain().focus().setTextAlign("left").run()} className={`tool-button p-2 rounded-xl ${editor.isActive({ textAlign: "left" }) ? "is-active" : ""}`} title="Align left"><AlignLeft className="w-4 h-4" /></button>
+              <button onClick={() => editor.chain().focus().setTextAlign("center").run()} className={`tool-button p-2 rounded-xl ${editor.isActive({ textAlign: "center" }) ? "is-active" : ""}`} title="Align centre"><AlignCenter className="w-4 h-4" /></button>
+              <button onClick={() => editor.chain().focus().setTextAlign("right").run()} className={`tool-button p-2 rounded-xl ${editor.isActive({ textAlign: "right" }) ? "is-active" : ""}`} title="Align right"><AlignRight className="w-4 h-4" /></button>
+              <span className="w-px h-5 bg-slate-800 mx-1.5" />
               <button
                 onClick={() => editor.chain().focus().toggleBold().run()}
                 className={`p-2 rounded-xl transition-all text-xs font-bold ${editor.isActive("bold") ? "tool-button is-active" : "tool-button"}`}
