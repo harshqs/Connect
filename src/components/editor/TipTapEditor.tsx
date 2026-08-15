@@ -157,6 +157,13 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         Image.configure({
           allowBase64: false,
           HTMLAttributes: { class: "editor-image" },
+          resize: {
+            enabled: true,
+            directions: ["bottom-right", "bottom-left"],
+            minWidth: 160,
+            minHeight: 100,
+            alwaysPreserveAspectRatio: true,
+          },
         }),
         Collaboration.configure({ document: ydoc }),
         provider
