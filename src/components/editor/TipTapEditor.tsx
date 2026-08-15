@@ -10,6 +10,9 @@ import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import CharacterCount from "@tiptap/extension-character-count";
 import Link from "@tiptap/extension-link";
+import TextStyle from "@tiptap/extension-text-style";
+import FontFamily from "@tiptap/extension-font-family";
+import Color from "@tiptap/extension-color";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { IndexeddbPersistence } from "y-indexeddb";
@@ -51,6 +54,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
     const [provider, setProvider] = useState<WebsocketProvider | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [typingNames, setTypingNames] = useState<string[]>([]);
+    const [fontSize, setFontSize] = useState("16px");
 
     // Stable session ID for this browser tab — survives React StrictMode double-mounts
     const sessionIdRef = React.useRef<string | null>(null);
@@ -143,6 +147,9 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         Highlight.configure({ multicolor: true }),
         CharacterCount,
         Link.configure({ openOnClick: false }),
+        TextStyle,
+        FontFamily.configure({ types: ["textStyle"] }),
+        Color.configure({ types: ["textStyle"] }),
         Collaboration.configure({ document: ydoc }),
         provider
           ? CollaborationCursor.configure({
@@ -219,6 +226,32 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         {!readOnly && (
           <div className="editor-toolbar flex flex-wrap items-center justify-between gap-2 p-2.5">
             <div className="flex flex-wrap items-center gap-1">
+              <select
+                aria-label="Font family"
+                value={editor.getAttributes("textStyle").fontFamily || "Inter"}
+                onChange={(event) => editor.chain().focus().setFontFamily(event.target.value).run()}
+                className="h-8 max-w-30 rounded-lg border border-[#dce8df] bg-white px-2 text-xs font-semibold text-[#466259] outline-none focus:border-[#4db59d]"
+              >
+                <option value="Inter">Inter</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Arial">Arial</option>
+                <option value="Courier New">Courier New</option>
+              </select>
+              <select
+                aria-label="Font size"
+                value={fontSize}
+                onChange={(event) => {
+                  setFontSize(event.target.value);
+                  editor.chain().focus().setMark("textStyle", { "font-size": event.target.value }).run();
+                }}
+                className="h-8 rounded-lg border border-[#dce8df] bg-white px-2 text-xs font-semibold text-[#466259] outline-none focus:border-[#4db59d]"
+              >
+                <option value="14px">14</option><option value="16px">16</option><option value="18px">18</option><option value="22px">22</option><option value="28px">28</option>
+              </select>
+              <label className="grid size-8 cursor-pointer place-items-center rounded-lg border border-[#dce8df] bg-white" title="Text color">
+                <span className="size-3 rounded-full bg-[#287d67]" />
+                <input aria-label="Text color" type="color" value={editor.getAttributes("textStyle").color || "#287d67"} onChange={(event) => editor.chain().focus().setColor(event.target.value).run()} className="sr-only" />
+              </label>
               <button
                 onClick={() => editor.chain().focus().toggleBold().run()}
                 className={`p-2 rounded-xl transition-all text-xs font-bold ${editor.isActive("bold") ? "tool-button is-active" : "tool-button"}`}
