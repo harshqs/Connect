@@ -119,27 +119,46 @@ app.post("/api/documents/:id/research", async (req: Request, res: Response) => {
 
   const question = String(req.body?.question || "").trim().slice(0, 2000);
   if (!question) return res.status(400).json({ error: "Ask a research question first" });
-  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Research is not configured. Add OPENAI_API_KEY in Render." });
+  if (!process.env.OPENAI_API_KEY && !process.env.GROQ_API_KEY) return res.status(503).json({ error: "Research is not configured. Add OPENAI_API_KEY or GROQ_API_KEY in Render." });
 
   try {
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await client.responses.create({
-      model: process.env.OPENAI_MODEL || "gpt-5",
-      tools: [{ type: "web_search" }],
-      store: false,
-      input: `Research this question for a collaborative document: ${question}\n\nGive a concise, neutral answer in Markdown. Make claims only when supported by the web sources.`,
-    } as any);
     const sources: Array<{ title: string; url: string }> = [];
-    for (const item of (response as any).output || []) {
-      for (const content of item.content || []) {
-        for (const annotation of content.annotations || []) {
-          if (annotation.type === "url_citation" && annotation.url && !sources.some((source) => source.url === annotation.url)) {
-            sources.push({ title: annotation.title || new URL(annotation.url).hostname, url: annotation.url });
+    let answer = "";
+
+    if (process.env.GROQ_API_KEY) {
+      const client = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" });
+      const response = await client.chat.completions.create({
+        model: process.env.GROQ_MODEL || "groq/compound",
+        messages: [{ role: "user", content: `Research this question for a collaborative document: ${question}\n\nGive a concise, neutral answer and use web search for current facts.` }],
+        citation_options: "enabled",
+      } as any);
+      const message = response.choices[0]?.message as any;
+      answer = message?.content || "No research answer was returned.";
+      for (const tool of message?.executed_tools || []) {
+        for (const source of tool.search_results?.results || []) {
+          if (source.url && !sources.some((item) => item.url === source.url)) sources.push({ title: source.title || new URL(source.url).hostname, url: source.url });
+        }
+      }
+    } else {
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const response = await client.responses.create({
+        model: process.env.OPENAI_MODEL || "gpt-5",
+        tools: [{ type: "web_search" }],
+        store: false,
+        input: `Research this question for a collaborative document: ${question}\n\nGive a concise, neutral answer in Markdown. Make claims only when supported by the web sources.`,
+      } as any);
+      answer = response.output_text;
+      for (const item of (response as any).output || []) {
+        for (const content of item.content || []) {
+          for (const annotation of content.annotations || []) {
+            if (annotation.type === "url_citation" && annotation.url && !sources.some((source) => source.url === annotation.url)) {
+              sources.push({ title: annotation.title || new URL(annotation.url).hostname, url: annotation.url });
+            }
           }
         }
       }
     }
-    res.json({ answer: response.output_text, sources });
+    res.json({ answer, sources });
   } catch (error) {
     console.error("Research error:", error);
     res.status(502).json({ error: "Research could not be completed. Check the OpenAI key and billing." });

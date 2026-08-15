@@ -108,6 +108,10 @@ FRONTEND_URL=https://connect-seven-ecru.vercel.app
 OPENAI_API_KEY=...                  (keep private; required for AI Research)
 # Optional: defaults to gpt-5
 OPENAI_MODEL=gpt-5
+
+# Alternative research provider: Groq (takes priority when set)
+GROQ_API_KEY=...                    (keep private)
+GROQ_MODEL=groq/compound
 ```
 
 ### Vercel (frontend) — set in Vercel dashboard
