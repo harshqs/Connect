@@ -9,12 +9,15 @@ import {
   MessageSquare,
   ArrowLeft,
   Check,
+  PenTool,
+  FileText as DocumentIcon,
 } from "lucide-react";
 import { TipTapEditor, TipTapEditorHandle } from "@/components/editor/TipTapEditor";
 import { PresenceBar, ActiveUser } from "@/components/collaboration/PresenceBar";
 import { ShareModal } from "@/components/collaboration/ShareModal";
 import { VersionHistory } from "@/components/editor/VersionHistory";
 import { CommentSidebar } from "@/components/editor/CommentSidebar";
+import { CollaborativeCanvas } from "@/components/canvas/CollaborativeCanvas";
 import {
   DocumentItem, fetchDocumentById, fetchCurrentUser,
   updateDocument, Comment, DocumentVersion,
@@ -41,6 +44,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
   const [historyOpen, setHistoryOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [titleSaved, setTitleSaved] = useState(false);
+  const [workspace, setWorkspace] = useState<"document" | "canvas">("document");
 
   useEffect(() => {
     async function loadUser() {
@@ -215,6 +219,12 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
 
       {/* Main Editor Container */}
       <main className="w-full max-w-6xl mx-auto p-4 pt-8 md:p-10 md:pt-12 flex-1 editor-enter">
+        {!loadError && documentData && (
+          <div className="mb-4 inline-flex rounded-xl border border-[#dfe5de] bg-white p-1 shadow-sm">
+            <button onClick={() => setWorkspace("document")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${workspace === "document" ? "bg-[#e7f2eb] text-[#1d6954]" : "text-[#668077]"}`}><DocumentIcon className="size-3.5" /> Document</button>
+            <button onClick={() => setWorkspace("canvas")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${workspace === "canvas" ? "bg-[#e7f2eb] text-[#1d6954]" : "text-[#668077]"}`}><PenTool className="size-3.5" /> Whiteboard</button>
+          </div>
+        )}
         {loadError ? (
           <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl p-8 text-center">
             <div>
@@ -223,13 +233,15 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
               <Link href="/" className="primary-action mt-6 inline-flex rounded-xl px-4 py-2.5 text-sm font-bold">Back to home</Link>
             </div>
           </div>
-        ) : documentData ? (
+        ) : documentData && workspace === "document" ? (
           <TipTapEditor
             ref={editorRef}
             documentId={documentData.id}
             currentUser={currentUser}
             onPresenceUpdate={handlePresenceUpdate}
           />
+        ) : documentData ? (
+          <CollaborativeCanvas documentId={documentData.id} currentUser={currentUser} />
         ) : (
           <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl text-sm text-[#668077]">Loading document…</div>
         )}

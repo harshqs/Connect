@@ -61,7 +61,11 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
 
     // Stable session ID for this browser tab — survives React StrictMode double-mounts
     const sessionIdRef = React.useRef<string | null>(null);
-    if (!sessionIdRef.current) sessionIdRef.current = Math.random().toString(36).slice(2);
+    if (!sessionIdRef.current && typeof window !== "undefined") {
+      const sessionKey = `connect-session:${documentId}`;
+      sessionIdRef.current = window.sessionStorage.getItem(sessionKey) || Math.random().toString(36).slice(2);
+      window.sessionStorage.setItem(sessionKey, sessionIdRef.current);
+    }
     const sessionId = sessionIdRef.current;
 
     // Yjs document
