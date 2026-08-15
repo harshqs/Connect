@@ -9,6 +9,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import CharacterCount from "@tiptap/extension-character-count";
+import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
 import * as Y from "yjs";
@@ -28,6 +29,7 @@ import {
   Heading2,
   Undo,
   Redo,
+  ImageUp,
 } from "lucide-react";
 import { ActiveUser } from "@/components/collaboration/PresenceBar";
 
@@ -53,6 +55,9 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
     const [isConnected, setIsConnected] = useState(false);
     const [typingNames, setTypingNames] = useState<string[]>([]);
     const [fontSize, setFontSize] = useState("16px");
+    const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const imageInputRef = React.useRef<HTMLInputElement>(null);
 
     // Stable session ID for this browser tab — survives React StrictMode double-mounts
     const sessionIdRef = React.useRef<string | null>(null);
@@ -149,6 +154,10 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         FontFamily.configure({ types: ["textStyle"] }),
         FontSize.configure({ types: ["textStyle"] }),
         Color.configure({ types: ["textStyle"] }),
+        Image.configure({
+          allowBase64: false,
+          HTMLAttributes: { class: "editor-image" },
+        }),
         Collaboration.configure({ document: ydoc }),
         provider
           ? CollaborationCursor.configure({
@@ -219,12 +228,79 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
     const characterCount = editor.storage.characterCount?.characters() || 0;
     const wordCount = editor.storage.characterCount?.words() || 0;
 
+    const uploadImage = async (file: File) => {
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+      if (!cloudName || !uploadPreset) {
+        setImageUploadError("Image upload is not configured yet. Add the Cloudinary settings to Vercel first.");
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        setImageUploadError("Please choose an image file.");
+        return;
+      }
+
+      if (file.size > 8 * 1024 * 1024) {
+        setImageUploadError("Choose an image smaller than 8 MB.");
+        return;
+      }
+
+      setImageUploadError(null);
+      setIsUploadingImage(true);
+
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", uploadPreset);
+
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+          method: "POST",
+          body: formData,
+        });
+        const result = (await response.json()) as { secure_url?: string; error?: { message?: string } };
+
+        if (!response.ok || !result.secure_url) {
+          throw new Error(result.error?.message || "Cloudinary could not upload this image.");
+        }
+
+        editor.chain().focus().setImage({ src: result.secure_url, alt: file.name }).run();
+      } catch (error) {
+        setImageUploadError(error instanceof Error ? error.message : "Image upload failed. Please try again.");
+      } finally {
+        setIsUploadingImage(false);
+      }
+    };
+
     return (
       <div className="editor-canvas w-full flex flex-col rounded-2xl overflow-hidden">
         {/* Toolbar */}
         {!readOnly && (
           <div className="editor-toolbar flex flex-wrap items-center justify-between gap-2 p-2.5">
             <div className="flex flex-wrap items-center gap-1">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="sr-only"
+                onChange={(event) => {
+                  const [file] = Array.from(event.target.files || []);
+                  event.target.value = "";
+                  if (file) void uploadImage(file);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isUploadingImage}
+                className="tool-button flex items-center gap-1.5 p-2 rounded-xl disabled:cursor-wait disabled:opacity-60"
+                title="Upload an image"
+              >
+                <ImageUp className="w-4 h-4" />
+                <span className="text-xs font-semibold">{isUploadingImage ? "Uploading" : "Image"}</span>
+              </button>
+              <span className="w-px h-5 bg-slate-800 mx-1.5" />
               <select
                 aria-label="Font family"
                 value={editor.getAttributes("textStyle").fontFamily || "Inter"}
@@ -354,6 +430,11 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         )}
 
         <div className="editor-workarea relative min-h-[520px]">
+          {imageUploadError && (
+            <div className="absolute left-6 top-5 z-10 max-w-md rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 shadow-sm">
+              {imageUploadError}
+            </div>
+          )}
           {typingNames.length > 0 && (
             <div className="absolute right-6 top-5 z-10 flex items-center gap-2 rounded-full border border-[#d8e8dd] bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#287d67] shadow-sm backdrop-blur">
               <span className="flex gap-0.5"><i className="typing-dot" /><i className="typing-dot" /><i className="typing-dot" /></span>

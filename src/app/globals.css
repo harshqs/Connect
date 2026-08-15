@@ -86,6 +86,8 @@
 .editor-canvas .ProseMirror code { background: #edf4ef; border-color: #d9e8df; color: #216750; }
 .editor-canvas .ProseMirror pre { background: #17332c; color: #edf5ef; }
 .editor-canvas .ProseMirror p.is-editor-empty:first-child::before { color: #91a59b; }
+.editor-canvas .ProseMirror .editor-image { display: block; max-width: 100%; height: auto; margin: 1.5rem auto; border: 1px solid #dce8df; border-radius: 14px; box-shadow: 0 12px 28px rgba(30, 52, 43, .12); }
+.editor-canvas .ProseMirror .editor-image.ProseMirror-selectednode { outline: 3px solid rgba(77, 181, 157, .55); outline-offset: 3px; }
 .tool-button { color: #60746b; transition: color .16s ease, background-color .16s ease, transform .16s ease; }
 .tool-button:hover { color: #173e33; background: #e7f2eb; transform: translateY(-1px); }
 .tool-button.is-active { color: #fff; background: #287d67; box-shadow: 0 4px 10px rgba(40,125,103,.2); }
