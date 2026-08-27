@@ -4,6 +4,11 @@
   "description": "Real-time collaborative coding bridge between VS Code and Connect Workspace (Docs, Canvas, AI Research)",
   "version": "0.1.0",
   "publisher": "connect",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/harshqs/Connect"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -12,6 +17,12 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
+    "*",
+    "onStartupFinished",
+    "onCommand:connect.startSession",
+    "onCommand:connect.joinSession",
+    "onCommand:connect.openLiveWebview",
+    "onCommand:connect.stopSession",
     "onUri"
   ],
   "contributes": {
