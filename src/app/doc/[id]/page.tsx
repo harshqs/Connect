@@ -20,6 +20,7 @@ import { VersionHistory } from "@/components/editor/VersionHistory";
 import { CommentSidebar } from "@/components/editor/CommentSidebar";
 import { CollaborativeCanvas } from "@/components/canvas/CollaborativeCanvas";
 import { ResearchPanel } from "@/components/research/ResearchPanel";
+import { VSCodeBridge } from "@/components/vscode/VSCodeBridge";
 import {
   DocumentItem, fetchDocumentById, fetchCurrentUser,
   updateDocument, Comment, DocumentVersion,
@@ -288,6 +289,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         currentUserName={currentUser.name}
       />
       {researchOpen && documentData && <ResearchPanel documentId={documentData.id} onClose={() => setResearchOpen(false)} />}
+      <VSCodeBridge documentId={docId} currentUser={currentUser} />
     </div>
   );
 }
