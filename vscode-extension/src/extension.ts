@@ -92,7 +92,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ─── 6. Live Text Editor Change & Selection Sync ──────────────────────────────
   const syncDocument = (doc: vscode.TextDocument) => {
-    if (!activeSession) return;
+    if (!activeSession || isApplyingRemote) return;
     const fileName = doc.isUntitled ? (doc.fileName.split(/[/\\]/).pop() || "Untitled-1") : vscode.workspace.asRelativePath(doc.uri);
     const content = doc.getText();
     const codeMap = activeSession.ydoc.getMap<string>("code-files");
@@ -144,6 +144,8 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
+let isApplyingRemote = false;
+
 function startLiveSession(
   context: vscode.ExtensionContext,
   roomId: string,
@@ -178,14 +180,58 @@ function startLiveSession(
     statusBarItem,
   };
 
+  const codeMap = ydoc.getMap<string>("code-files");
+
   // Sync initial open file if exists
   const activeEditor = vscode.window.activeTextEditor;
   if (activeEditor) {
-    const fileName = vscode.workspace.asRelativePath(activeEditor.document.uri);
+    const fileName = activeEditor.document.isUntitled
+      ? (activeEditor.document.fileName.split(/[/\\]/).pop() || "Untitled-1")
+      : vscode.workspace.asRelativePath(activeEditor.document.uri);
     const content = activeEditor.document.getText();
-    const codeMap = ydoc.getMap<string>("code-files");
-    codeMap.set(fileName, content);
+    if (content.trim()) {
+      codeMap.set(fileName, content);
+    }
   }
+
+  // Listen to remote changes from collaborators
+  codeMap.observe(async (event) => {
+    if (isApplyingRemote) return;
+
+    event.keysChanged.forEach(async (fileName) => {
+      const newContent = codeMap.get(fileName);
+      if (newContent === undefined) return;
+
+      const editors = vscode.window.visibleTextEditors;
+      let matchedEditor = editors.find((ed) => {
+        const edName = ed.document.isUntitled
+          ? (ed.document.fileName.split(/[/\\]/).pop() || "Untitled-1")
+          : vscode.workspace.asRelativePath(ed.document.uri);
+        return edName === fileName || (ed.document.isUntitled && editors.length === 1);
+      });
+
+      if (matchedEditor) {
+        if (matchedEditor.document.getText() !== newContent) {
+          isApplyingRemote = true;
+          const fullRange = new vscode.Range(
+            matchedEditor.document.positionAt(0),
+            matchedEditor.document.positionAt(matchedEditor.document.getText().length)
+          );
+          await matchedEditor.edit((editBuilder) => {
+            editBuilder.replace(fullRange, newContent);
+          });
+          isApplyingRemote = false;
+        }
+      } else if (vscode.window.visibleTextEditors.length === 0 || vscode.window.activeTextEditor?.document.getText().trim() === "") {
+        // Automatically open the remote file in editor!
+        isApplyingRemote = true;
+        const lang = fileName.endsWith(".html") ? "html" : fileName.endsWith(".css") ? "css" : fileName.endsWith(".js") || fileName.endsWith(".ts") || fileName.endsWith(".tsx") ? "javascript" : "plaintext";
+        const doc = await vscode.workspace.openTextDocument({ content: newContent, language: lang });
+        await vscode.window.showTextDocument(doc, { preview: false });
+        isApplyingRemote = false;
+      }
+    });
+  });
 
   vscode.window
     .showInformationMessage(

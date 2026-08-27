@@ -211,7 +211,7 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
             </div>
 
             {/* 1-Click Action: Jump into VS Code */}
-            <div className="pt-1">
+            <div className="pt-1 space-y-2">
               <a
                 href={deepLink}
                 className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2b7c6a] to-[#4db59d] px-4 py-2.5 text-xs font-bold text-[#081512] shadow-lg shadow-[#4db59d]/20 transition hover:brightness-110 active:scale-[0.98]"
@@ -220,9 +220,18 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
                 <span>Jump into VS Code</span>
                 <ExternalLink className="size-3.5 opacity-80" />
               </a>
-              <p className="mt-1.5 text-center text-[10px] text-[#718b80]">
-                Opens your local VS Code and connects directly to this room
-              </p>
+              
+              <div className="flex items-center justify-between text-[10px] text-[#718b80] px-1">
+                <span>First time?</span>
+                <a
+                  href="https://github.com/harshqs/Connect/raw/main/vscode-extension/connect-live-0.1.0.vsix"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[#4db59d] hover:underline flex items-center gap-1"
+                >
+                  Download Extension (.vsix)
+                </a>
+              </div>
             </div>
 
           </div>
