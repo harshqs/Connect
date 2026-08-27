@@ -15,6 +15,9 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  Trash2,
+  RefreshCw,
+  Power,
 } from "lucide-react";
 
 interface VSCodeUser {
@@ -112,6 +115,15 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
     activeFiles.find((f) => f.name === selectedFile)?.content ||
     `// Live coding session ready\n// Connect with VS Code to collaborate live\nconsole.log("Connect ↔ VS Code Live Bridge active");`;
 
+  const handleClearFiles = () => {
+    if (window.confirm("Clear all shared code files in this session and start fresh?")) {
+      const codeMap = ydoc.getMap<string>("code-files");
+      codeMap.clear();
+      setActiveFiles([]);
+      setSelectedFile("");
+    }
+  };
+
   return (
     <aside
       className={`fixed bottom-6 right-6 z-40 transition-all duration-300 ${
@@ -149,6 +161,13 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
           </div>
 
           <div className="flex items-center gap-1">
+            <button
+              onClick={handleClearFiles}
+              className="p-1 rounded-lg text-[#8fa79b] hover:bg-rose-500/20 hover:text-rose-300 transition"
+              title="Clear old files & start fresh"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
             <button
               onClick={() => setIsExpanded(!isExpanded)}
               className="p-1 rounded-lg text-[#8fa79b] hover:bg-white/10 hover:text-white transition"
@@ -214,21 +233,31 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
 
             {/* Interactive File Tabs (index.html, style.css, etc.) */}
             {activeFiles.length > 0 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                {activeFiles.map((file) => (
-                  <button
-                    key={file.name}
-                    onClick={() => setSelectedFile(file.name)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono transition ${
-                      selectedFile === file.name
-                        ? "bg-[#4db59d]/20 text-[#7be3c4] font-bold border border-[#4db59d]/40"
-                        : "bg-white/[0.04] text-[#8fa79b] hover:bg-white/[0.08] hover:text-white"
-                    }`}
-                  >
-                    <FileCode className="size-3 text-[#4db59d]" />
-                    <span>{file.name}</span>
-                  </button>
-                ))}
+              <div className="flex items-center justify-between gap-1.5 overflow-x-auto pb-1 text-xs">
+                <div className="flex items-center gap-1.5 overflow-x-auto">
+                  {activeFiles.map((file) => (
+                    <button
+                      key={file.name}
+                      onClick={() => setSelectedFile(file.name)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono transition ${
+                        selectedFile === file.name
+                          ? "bg-[#4db59d]/20 text-[#7be3c4] font-bold border border-[#4db59d]/40"
+                          : "bg-white/[0.04] text-[#8fa79b] hover:bg-white/[0.08] hover:text-white"
+                      }`}
+                    >
+                      <FileCode className="size-3 text-[#4db59d]" />
+                      <span>{file.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={handleClearFiles}
+                  className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-500/10 text-rose-300 text-[10px] hover:bg-rose-500/20 transition font-medium"
+                  title="Clear room code & start fresh"
+                >
+                  <Trash2 className="size-3" />
+                  <span>Reset</span>
+                </button>
               </div>
             )}
 
