@@ -83,9 +83,9 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "vscode:prepublish": "esbuild ./src/extension.ts --bundle --outfile=./dist/extension.js --external:vscode --format=cjs --platform=node",
+    "compile": "esbuild ./src/extension.ts --bundle --outfile=./dist/extension.js --external:vscode --format=cjs --platform=node",
+    "watch": "esbuild ./src/extension.ts --bundle --outfile=./dist/extension.js --external:vscode --format=cjs --platform=node --watch"
   },
   "dependencies": {
     "ws": "^8.18.0",
@@ -96,6 +96,7 @@
     "@types/node": "^20.x",
     "@types/vscode": "^1.80.0",
     "@types/ws": "^8.5.10",
+    "esbuild": "^0.25.12",
     "typescript": "^5.3.3"
   }
 }
