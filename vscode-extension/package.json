@@ -60,12 +60,12 @@
       "properties": {
         "connect.serverUrl": {
           "type": "string",
-          "default": "ws://localhost:1234",
+          "default": "wss://connect-y61u.onrender.com",
           "description": "WebSocket URL of the Connect collaboration server"
         },
         "connect.webAppUrl": {
           "type": "string",
-          "default": "http://localhost:3000",
+          "default": "https://connect-seven-ecru.vercel.app",
           "description": "Base URL of the Connect web application"
         }
       }

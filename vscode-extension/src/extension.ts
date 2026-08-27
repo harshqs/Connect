@@ -29,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
       handleUri(uri: vscode.Uri) {
         const queryParams = new URLSearchParams(uri.query);
         const roomId = queryParams.get("room") || uri.path.replace(/^\//, "");
-        const serverUrl = queryParams.get("backend") || "ws://localhost:1234";
+        const serverUrl = queryParams.get("backend") || "wss://connect-y61u.onrender.com";
 
         if (roomId) {
           vscode.window.showInformationMessage(`Joining Connect Room: ${roomId}`);
@@ -44,13 +44,13 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("connect.startSession", async () => {
       const roomId = await vscode.window.showInputBox({
         prompt: "Enter Connect Room ID (e.g. from your web app URL)",
-        placeHolder: "doc-uuid-here",
+        placeHolder: "864c8088-ee5b-434d-b917-5440ed9f1d84",
       });
       if (!roomId) return;
 
       const config = vscode.workspace.getConfiguration("connect");
-      const serverUrl = config.get<string>("serverUrl") || "ws://localhost:1234";
-      startLiveSession(context, roomId, serverUrl, statusBarItem);
+      const serverUrl = config.get<string>("serverUrl") || "wss://connect-y61u.onrender.com";
+      startLiveSession(context, roomId.trim(), serverUrl, statusBarItem);
     })
   );
 
@@ -186,7 +186,7 @@ function startLiveSession(
 
 function openLiveWebview(context: vscode.ExtensionContext, roomId: string) {
   const config = vscode.workspace.getConfiguration("connect");
-  const webAppUrl = config.get<string>("webAppUrl") || "http://localhost:3000";
+  const webAppUrl = config.get<string>("webAppUrl") || "https://connect-seven-ecru.vercel.app";
   const targetUrl = `${webAppUrl}/doc/${roomId}`;
 
   if (currentWebviewPanel) {
@@ -250,7 +250,7 @@ class ConnectSidebarViewProvider implements vscode.WebviewViewProvider {
       }
 
       const config = vscode.workspace.getConfiguration("connect");
-      const webAppUrl = config.get<string>("webAppUrl") || "http://localhost:3000";
+      const webAppUrl = config.get<string>("webAppUrl") || "https://connect-seven-ecru.vercel.app";
       const targetUrl = `${webAppUrl}/doc/${activeSession.roomId}`;
 
       webviewView.webview.html = `
