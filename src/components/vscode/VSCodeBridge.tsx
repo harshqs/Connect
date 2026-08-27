@@ -170,20 +170,31 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
         {isOpen && (
           <div className="p-4 space-y-3">
             
-            {/* Collaborator Activity Header */}
-            {activeVSCodeUser ? (
-              <div className="flex items-center justify-between rounded-xl bg-white/[0.04] p-2.5 border border-white/10 text-xs">
-                <div className="flex items-center gap-2">
+            {/* All Active Collaborators List */}
+            {vscodeUsers.length > 0 ? (
+              <div className="space-y-1.5 max-h-28 overflow-y-auto">
+                {vscodeUsers.map((cu) => (
                   <div
-                    className="size-3 rounded-full"
-                    style={{ backgroundColor: activeVSCodeUser.color }}
-                  />
-                  <span className="font-bold text-white">{activeVSCodeUser.name}</span>
-                  <span className="text-[#8fa79b]">is editing</span>
-                  <span className="font-mono text-[#7be3c4] bg-[#4db59d]/10 px-1.5 py-0.5 rounded">
-                    {activeVSCodeUser.activeFile || "index.html"}:{activeVSCodeUser.activeLine || 1}
-                  </span>
-                </div>
+                    key={cu.id}
+                    className="flex items-center justify-between rounded-xl bg-white/[0.04] p-2 border border-white/10 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="size-2.5 rounded-full"
+                        style={{ backgroundColor: cu.user.color }}
+                      />
+                      <span className="font-bold text-white text-[11px]">{cu.user.name}</span>
+                      <span className="text-[#8fa79b] text-[10px]">editing</span>
+                      <button
+                        onClick={() => setSelectedFile(cu.user.activeFile || "index.html")}
+                        className="font-mono text-[#7be3c4] bg-[#4db59d]/15 px-1.5 py-0.5 rounded text-[10px] hover:underline"
+                        title="Click to view this file"
+                      >
+                        {cu.user.activeFile || "index.html"}:{cu.user.activeLine || 1}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="rounded-xl bg-white/[0.02] p-2.5 border border-white/5 text-[11px] text-[#8fa79b] flex items-center justify-between">
@@ -201,12 +212,32 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
               </div>
             )}
 
+            {/* Interactive File Tabs (index.html, style.css, etc.) */}
+            {activeFiles.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                {activeFiles.map((file) => (
+                  <button
+                    key={file.name}
+                    onClick={() => setSelectedFile(file.name)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono transition ${
+                      selectedFile === file.name
+                        ? "bg-[#4db59d]/20 text-[#7be3c4] font-bold border border-[#4db59d]/40"
+                        : "bg-white/[0.04] text-[#8fa79b] hover:bg-white/[0.08] hover:text-white"
+                    }`}
+                  >
+                    <FileCode className="size-3 text-[#4db59d]" />
+                    <span>{file.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Code Snippet / Live Terminal Preview */}
             <div className="relative rounded-xl border border-black/40 bg-[#081512] p-3 font-mono text-xs">
               <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 text-[10px] text-[#6e8a7e]">
                 <div className="flex items-center gap-1.5">
                   <FileCode className="size-3 text-[#4db59d]" />
-                  <span>{activeVSCodeUser?.activeFile || selectedFile}</span>
+                  <span className="font-bold text-white">{selectedFile}</span>
                 </div>
                 <span className="text-[#4db59d] font-semibold">Live Buffer</span>
               </div>
@@ -233,10 +264,10 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
               <div className="flex items-center justify-between text-[10px] text-[#718b80] px-1">
                 <span>First time?</span>
                 <a
-                  href="https://github.com/harshqs/Connect/raw/main/vscode-extension/connect-live-0.1.0.vsix"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="/connect-live.vsix"
+                  download="connect-live.vsix"
                   className="font-semibold text-[#4db59d] hover:underline flex items-center gap-1"
+                  title="Direct 1-click download of latest VS Code extension"
                 >
                   Download Extension (.vsix)
                 </a>
