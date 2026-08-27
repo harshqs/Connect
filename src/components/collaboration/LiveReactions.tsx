@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Smile, Sparkles } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import { Smile } from "lucide-react";
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
 
 interface FloatingEmoji {
   id: string;
@@ -21,20 +23,66 @@ const EMOJIS = ["❤️", "🔥", "🚀", "👏", "🎉", "💡"];
 export function LiveReactions({ documentId, currentUser, onSendReaction }: LiveReactionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeEmojis, setActiveEmojis] = useState<FloatingEmoji[]>([]);
+  
+  const providerRef = useRef<WebsocketProvider | null>(null);
+  const processedReactions = useRef<Set<string>>(new Set());
 
-  const triggerEmoji = (emoji: string) => {
+  useEffect(() => {
+    const ydoc = new Y.Doc();
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "wss://connect-y61u.onrender.com";
+    const provider = new WebsocketProvider(wsUrl, "yjs", ydoc, {
+      params: { docId: `reactions-${documentId}` },
+    });
+    providerRef.current = provider;
+
+    const handleAwarenessChange = ({ added, updated }: any) => {
+      const states = provider.awareness.getStates();
+      [...added, ...updated].forEach((clientId: number) => {
+        if (clientId === provider.awareness.clientID) return;
+        const state: any = states.get(clientId);
+        if (state && state.reaction) {
+          const id = state.reaction.id;
+          if (!processedReactions.current.has(id)) {
+            processedReactions.current.add(id);
+            triggerLocalEmoji(state.reaction.emoji, id);
+          }
+        }
+      });
+    };
+
+    provider.awareness.on("change", handleAwarenessChange);
+
+    return () => {
+      provider.destroy();
+      ydoc.destroy();
+    };
+  }, [documentId]);
+
+  const triggerLocalEmoji = (emoji: string, id: string) => {
     const newEmoji: FloatingEmoji = {
-      id: Math.random().toString(),
+      id,
       emoji,
       x: Math.random() * 60 + 20, // percentage from left
       y: Math.random() * 30 + 60, // percentage from top
     };
     setActiveEmojis((prev) => [...prev, newEmoji]);
-    onSendReaction?.(emoji);
-
+    
     setTimeout(() => {
       setActiveEmojis((prev) => prev.filter((e) => e.id !== newEmoji.id));
-    }, 2500);
+      processedReactions.current.delete(id);
+    }, 3000);
+  };
+
+  const triggerEmoji = (emoji: string) => {
+    const id = Math.random().toString();
+    // Show locally
+    triggerLocalEmoji(emoji, id);
+    onSendReaction?.(emoji);
+
+    // Broadcast to peers
+    if (providerRef.current) {
+      providerRef.current.awareness.setLocalStateField("reaction", { emoji, id });
+    }
   };
 
   return (
