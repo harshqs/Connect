@@ -19,6 +19,12 @@ import {
   Download,
   Share2,
 } from "lucide-react";
+import Editor from "react-simple-code-editor";
+import Prism from "prismjs";
+import "prismjs/components/prism-javascript";
+import "prismjs/components/prism-css";
+import "prismjs/components/prism-markup";
+import "prismjs/themes/prism-tomorrow.css";
 
 interface CollaborativeCodeEditorProps {
   documentId: string;
@@ -340,13 +346,24 @@ export function CollaborativeCodeEditor({ documentId, currentUser }: Collaborati
               <span className="text-[10px] text-[#4db59d] font-bold">Real-time Yjs Sync</span>
             </div>
 
-            <div className="relative flex-1 p-2 font-mono text-xs">
-              <textarea
+            <div className="relative flex-1 font-mono text-xs overflow-auto">
+              <Editor
                 value={activeTab === "html" ? htmlCode : activeTab === "css" ? cssCode : jsCode}
-                onChange={(e) => updateCode(activeTab, e.target.value)}
-                placeholder={`Enter ${activeTab.toUpperCase()} code here...`}
-                spellCheck={false}
-                className="h-full w-full resize-none border-none bg-transparent p-2 font-mono text-xs leading-relaxed text-[#d4ece3] outline-none selection:bg-[#4db59d]/40 focus:ring-0"
+                onValueChange={(code) => updateCode(activeTab, code)}
+                highlight={(code) => Prism.highlight(
+                  code,
+                  Prism.languages[activeTab === "html" ? "markup" : activeTab === "js" ? "javascript" : "css"],
+                  activeTab === "html" ? "markup" : activeTab === "js" ? "javascript" : "css"
+                )}
+                padding={16}
+                style={{
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                  fontSize: 13,
+                  backgroundColor: 'transparent',
+                  minHeight: '100%',
+                }}
+                className="w-full text-[#d4ece3] selection:bg-[#4db59d]/40"
+                textareaClassName="outline-none focus:outline-none focus:ring-0"
               />
             </div>
           </div>
