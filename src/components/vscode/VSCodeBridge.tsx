@@ -188,7 +188,16 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
             ) : (
               <div className="rounded-xl bg-white/[0.02] p-2.5 border border-white/5 text-[11px] text-[#8fa79b] flex items-center justify-between">
                 <span>Waiting for peer in VS Code...</span>
-                <span className="font-mono text-[10px] text-[#4db59d]">Room #{documentId.slice(0, 6)}</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(documentId);
+                    alert("Copied Room ID: " + documentId + "\nSend this to your friend!");
+                  }}
+                  className="font-mono text-[10px] text-[#4db59d] hover:underline bg-[#4db59d]/10 px-2 py-0.5 rounded flex items-center gap-1"
+                  title="Click to copy Room ID"
+                >
+                  Room #{documentId.slice(0, 6)} (Copy)
+                </button>
               </div>
             )}
 
