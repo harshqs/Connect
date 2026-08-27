@@ -17,13 +17,18 @@ export const metadata: Metadata = {
   description: "A calm space for real-time collaboration.",
 };
 
+import { MouseFollower } from "@/components/ui/MouseFollower";
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <MouseFollower />
+        {children}
+      </body>
     </html>
   );
 }
