@@ -42,7 +42,7 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
 
   useEffect(() => {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:1234";
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "wss://connect-y61u.onrender.com";
     const p = new WebsocketProvider(wsUrl, "yjs", ydoc, { params: { docId: documentId } });
 
     // Announce web user state
@@ -61,7 +61,7 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
             user: {
               name: state.user?.name || "VS Code User",
               color: state.user?.color || "#6366f1",
-              activeFile: state.vscodeState?.activeFile || "main.js",
+              activeFile: state.vscodeState?.activeFile || "Untitled-1",
               activeLine: state.vscodeState?.activeLine || 1,
               snippet: state.vscodeState?.snippet || "",
               clientType: "vscode",
@@ -104,12 +104,12 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
 
   const activeVSCodeUser = vscodeUsers[0]?.user;
   const deepLink = `vscode://connect-live/join?room=${documentId}&backend=${encodeURIComponent(
-    process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:1234"
+    process.env.NEXT_PUBLIC_WS_URL || "wss://connect-y61u.onrender.com"
   )}`;
 
   const currentFileContent =
-    activeFiles.find((f) => f.name === selectedFile)?.content ||
     activeVSCodeUser?.snippet ||
+    activeFiles.find((f) => f.name === selectedFile)?.content ||
     `// Live coding session ready\n// Connect with VS Code to collaborate live\nconsole.log("Connect ↔ VS Code Live Bridge active");`;
 
   return (
@@ -197,9 +197,9 @@ export function VSCodeBridge({ documentId, currentUser }: { documentId: string; 
               <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 text-[10px] text-[#6e8a7e]">
                 <div className="flex items-center gap-1.5">
                   <FileCode className="size-3 text-[#4db59d]" />
-                  <span>{selectedFile}</span>
+                  <span>{activeVSCodeUser?.activeFile || selectedFile}</span>
                 </div>
-                <span>Live Buffer</span>
+                <span className="text-[#4db59d] font-semibold">Live Buffer</span>
               </div>
               <pre
                 className={`overflow-x-auto text-[11px] leading-relaxed text-[#c3ded2] selection:bg-[#4db59d]/40 ${

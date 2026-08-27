@@ -90,26 +90,48 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider("connect.liveCanvasView", sidebarProvider)
   );
 
-  // ─── 6. Live Text Editor Change Sync ──────────────────────────────────────────
+  // ─── 6. Live Text Editor Change & Selection Sync ──────────────────────────────
+  const syncDocument = (doc: vscode.TextDocument) => {
+    if (!activeSession) return;
+    const fileName = doc.isUntitled ? (doc.fileName.split(/[/\\]/).pop() || "Untitled-1") : vscode.workspace.asRelativePath(doc.uri);
+    const content = doc.getText();
+    const codeMap = activeSession.ydoc.getMap<string>("code-files");
+    codeMap.set(fileName, content);
+
+    const editor = vscode.window.activeTextEditor;
+    if (editor && editor.document === doc) {
+      const activeLine = editor.selection.active.line + 1;
+      const lineText = editor.document.lineAt(editor.selection.active.line).text;
+      activeSession.provider.awareness.setLocalStateField("vscodeState", {
+        activeFile: fileName,
+        activeLine,
+        snippet: content.length < 5000 ? content : lineText.trim() || content.slice(0, 500),
+      });
+    }
+  };
+
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((event: vscode.TextDocumentChangeEvent) => {
-      if (!activeSession || event.document.isUntitled) return;
-      const fileName = vscode.workspace.asRelativePath(event.document.uri);
-      const content = event.document.getText();
-      const codeMap = activeSession.ydoc.getMap<string>("code-files");
-      codeMap.set(fileName, content);
+      if (!activeSession) return;
+      syncDocument(event.document);
+    })
+  );
 
-      // Broadcast active line & cursor snippet in awareness
-      const editor = vscode.window.activeTextEditor;
-      if (editor && editor.document === event.document) {
-        const activeLine = editor.selection.active.line + 1;
-        const lineText = editor.document.lineAt(editor.selection.active.line).text;
-        activeSession.provider.awareness.setLocalStateField("vscodeState", {
-          activeFile: fileName,
-          activeLine,
-          snippet: lineText.trim() || content.slice(0, 100),
-        });
-      }
+  // Track cursor position and selection movement
+  context.subscriptions.push(
+    vscode.window.onDidChangeTextEditorSelection((event: vscode.TextEditorSelectionChangeEvent) => {
+      if (!activeSession || !event.textEditor) return;
+      const doc = event.textEditor.document;
+      const fileName = doc.isUntitled ? (doc.fileName.split(/[/\\]/).pop() || "Untitled-1") : vscode.workspace.asRelativePath(doc.uri);
+      const content = doc.getText();
+      const activeLine = event.selections[0]?.active.line + 1 || 1;
+      const lineText = doc.lineAt(Math.max(0, activeLine - 1)).text;
+
+      activeSession.provider.awareness.setLocalStateField("vscodeState", {
+        activeFile: fileName,
+        activeLine,
+        snippet: content.length < 5000 ? content : lineText.trim() || content.slice(0, 500),
+      });
     })
   );
 
@@ -117,14 +139,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor: vscode.TextEditor | undefined) => {
       if (!activeSession || !editor) return;
-      const fileName = vscode.workspace.asRelativePath(editor.document.uri);
-      const activeLine = editor.selection.active.line + 1;
-      const lineText = editor.document.lineAt(editor.selection.active.line).text;
-      activeSession.provider.awareness.setLocalStateField("vscodeState", {
-        activeFile: fileName,
-        activeLine,
-        snippet: lineText.trim(),
-      });
+      syncDocument(editor.document);
     })
   );
 }
