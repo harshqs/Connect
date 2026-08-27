@@ -12,6 +12,7 @@ import {
   PenTool,
   FileText as DocumentIcon,
   Search,
+  Code2,
 } from "lucide-react";
 import { TipTapEditor, TipTapEditorHandle } from "@/components/editor/TipTapEditor";
 import { PresenceBar, ActiveUser } from "@/components/collaboration/PresenceBar";
@@ -20,6 +21,9 @@ import { VersionHistory } from "@/components/editor/VersionHistory";
 import { CommentSidebar } from "@/components/editor/CommentSidebar";
 import { CollaborativeCanvas } from "@/components/canvas/CollaborativeCanvas";
 import { ResearchPanel } from "@/components/research/ResearchPanel";
+import { CollaborativeCodeEditor } from "@/components/code/CollaborativeCodeEditor";
+import { VoiceHuddle } from "@/components/collaboration/VoiceHuddle";
+import { LiveReactions } from "@/components/collaboration/LiveReactions";
 import {
   DocumentItem, fetchDocumentById, fetchCurrentUser,
   updateDocument, Comment, DocumentVersion,
@@ -46,7 +50,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
   const [historyOpen, setHistoryOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [titleSaved, setTitleSaved] = useState(false);
-  const [workspace, setWorkspace] = useState<"document" | "canvas">("document");
+  const [workspace, setWorkspace] = useState<"document" | "canvas" | "code">("document");
   const [researchOpen, setResearchOpen] = useState(false);
 
   useEffect(() => {
@@ -189,20 +193,23 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
+          <VoiceHuddle documentId={docId} currentUser={currentUser} />
+          <LiveReactions documentId={docId} currentUser={currentUser} />
+
           <button
             onClick={() => setResearchOpen(true)}
-            className="flex items-center gap-2 rounded-xl border border-[#dfe5de] bg-white px-3 py-2.5 text-xs font-bold text-[#287d67] shadow-sm transition hover:bg-[#edf5ef]"
+            className="flex items-center gap-2 rounded-xl border border-[#dfe5de] bg-white px-3 py-2 text-xs font-bold text-[#287d67] shadow-sm transition hover:bg-[#edf5ef]"
             title="Research with AI"
           >
-            <Search className="w-4 h-4" />
+            <Search className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Research</span>
           </button>
           <button
             onClick={() => setCommentsOpen(!commentsOpen)}
-            className="relative p-2.5 rounded-xl bg-white hover:bg-[#edf5ef] text-[#466259] transition border border-[#dfe5de] shadow-sm"
+            className="relative p-2 rounded-xl bg-white hover:bg-[#edf5ef] text-[#466259] transition border border-[#dfe5de] shadow-sm"
             title="Comments"
           >
-            <MessageSquare className="w-4 h-4 text-[#287d67]" />
+            <MessageSquare className="w-3.5 h-3.5 text-[#287d67]" />
             {comments.length > 0 && (
               <span className="absolute -top-1 -right-1 w-4.5 h-4.5 rounded-full bg-cyan-500 text-[10px] font-extrabold flex items-center justify-center text-slate-950 shadow">
                 {comments.length}
@@ -212,28 +219,29 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
 
           <button
             onClick={() => setHistoryOpen(!historyOpen)}
-            className="p-2.5 rounded-xl bg-white hover:bg-[#edf5ef] text-[#466259] transition border border-[#dfe5de] shadow-sm"
+            className="p-2 rounded-xl bg-white hover:bg-[#edf5ef] text-[#466259] transition border border-[#dfe5de] shadow-sm"
             title="Version History"
           >
-            <History className="w-4 h-4 text-[#287d67]" />
+            <History className="w-3.5 h-3.5 text-[#287d67]" />
           </button>
 
           <button
             onClick={() => setShareModalOpen(true)}
-            className="primary-action flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs"
+            className="primary-action flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-xs"
           >
-            <Share2 className="w-4 h-4" />
+            <Share2 className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Share</span>
           </button>
         </div>
       </header>
 
       {/* Main Editor Container */}
-      <main className="w-full max-w-6xl mx-auto p-4 pt-8 md:p-10 md:pt-12 flex-1 editor-enter">
+      <main className="w-full max-w-6xl mx-auto p-4 pt-6 md:p-8 md:pt-8 flex-1 editor-enter">
         {!loadError && documentData && (
           <div className="mb-4 inline-flex rounded-xl border border-[#dfe5de] bg-white p-1 shadow-sm">
             <button onClick={() => setWorkspace("document")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${workspace === "document" ? "bg-[#e7f2eb] text-[#1d6954]" : "text-[#668077]"}`}><DocumentIcon className="size-3.5" /> Document</button>
             <button onClick={() => setWorkspace("canvas")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${workspace === "canvas" ? "bg-[#e7f2eb] text-[#1d6954]" : "text-[#668077]"}`}><PenTool className="size-3.5" /> Whiteboard</button>
+            <button onClick={() => setWorkspace("code")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${workspace === "code" ? "bg-[#e7f2eb] text-[#1d6954]" : "text-[#668077]"}`}><Code2 className="size-3.5" /> Code Sandbox</button>
           </div>
         )}
         {loadError ? (
@@ -251,10 +259,12 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
             currentUser={currentUser}
             onPresenceUpdate={handlePresenceUpdate}
           />
-        ) : documentData ? (
+        ) : documentData && workspace === "canvas" ? (
           <CollaborativeCanvas documentId={documentData.id} currentUser={currentUser} />
+        ) : documentData && workspace === "code" ? (
+          <CollaborativeCodeEditor documentId={documentData.id} currentUser={currentUser} />
         ) : (
-          <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl text-sm text-[#668077]">Loading document…</div>
+          <div className="editor-canvas grid min-h-[540px] place-items-center rounded-2xl text-sm text-[#668077]">Loading workspace…</div>
         )}
       </main>
 
