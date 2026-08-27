@@ -43,6 +43,11 @@
         "category": "Connect"
       },
       {
+        "command": "connect.showFiles",
+        "title": "Connect: Switch / Open Synced File",
+        "category": "Connect"
+      },
+      {
         "command": "connect.stopSession",
         "title": "Connect: Disconnect Session",
         "category": "Connect"

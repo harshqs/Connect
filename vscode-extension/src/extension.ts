@@ -84,7 +84,33 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // ─── 5. Sidebar Webview Provider ──────────────────────────────────────────────
+  // ─── 5. Command: Switch / Open Synced File ───────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand("connect.showFiles", async () => {
+      if (!activeSession) {
+        vscode.window.showWarningMessage("No active Connect session.");
+        return;
+      }
+      const codeMap = activeSession.ydoc.getMap<string>("code-files");
+      const files: string[] = [];
+      codeMap.forEach((_, key) => files.push(key));
+      if (files.length === 0) {
+        vscode.window.showInformationMessage("No shared files in this session yet.");
+        return;
+      }
+      const selected = await vscode.window.showQuickPick(files, {
+        placeHolder: "Select a collaborative file to open in VS Code",
+      });
+      if (selected) {
+        const content = codeMap.get(selected) || "";
+        const lang = selected.endsWith(".html") ? "html" : selected.endsWith(".css") ? "css" : selected.endsWith(".js") || selected.endsWith(".ts") || selected.endsWith(".tsx") ? "javascript" : "plaintext";
+        const doc = await vscode.workspace.openTextDocument({ content, language: lang });
+        await vscode.window.showTextDocument(doc, { preview: false });
+      }
+    })
+  );
+
+  // ─── 6. Sidebar Webview Provider ──────────────────────────────────────────────
   const sidebarProvider = new ConnectSidebarViewProvider(context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("connect.liveCanvasView", sidebarProvider)
