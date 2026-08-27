@@ -194,7 +194,6 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          <MusicLounge documentId={docId} currentUser={currentUser} />
           <VoiceHuddle documentId={docId} currentUser={currentUser} />
           <LiveReactions documentId={docId} currentUser={currentUser} />
 
@@ -300,6 +299,9 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
         currentUserName={currentUser.name}
       />
       {researchOpen && documentData && <ResearchPanel documentId={documentData.id} onClose={() => setResearchOpen(false)} />}
+
+      {/* Bottom Floating Music Lounge */}
+      <MusicLounge documentId={docId} currentUser={currentUser} />
     </div>
   );
 }
