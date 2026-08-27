@@ -265,6 +265,39 @@ export function CollaborativeCanvas({ documentId, currentUser }: { documentId: s
     image.src = URL.createObjectURL(new Blob([source], { type: "image/svg+xml" })); 
   };
 
+  const exportPdf = async () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    try {
+      const { jsPDF } = await import("jspdf");
+      const source = new XMLSerializer().serializeToString(svg);
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, W, H);
+          ctx.drawImage(image, 0, 0);
+        }
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({
+          orientation: "landscape",
+          unit: "px",
+          format: [W, H],
+        });
+        pdf.addImage(imgData, "PNG", 0, 0, W, H);
+        pdf.save("connect-canvas.pdf");
+        URL.revokeObjectURL(image.src);
+      };
+      image.src = URL.createObjectURL(new Blob([source], { type: "image/svg+xml" }));
+    } catch (e) {
+      console.error("PDF generation error:", e);
+    }
+  };
+
   const renderShape = (shape: Shape) => { 
     const active = selectedId === shape.id; 
     const common = { 
@@ -386,8 +419,11 @@ export function CollaborativeCanvas({ documentId, currentUser }: { documentId: s
           <button onClick={loadTemplate} className="rounded-lg px-3 py-1.5 text-xs font-bold text-[#287d67] hover:bg-[#e7f2eb] transition">
             Flow Template
           </button>
-          <button onClick={exportPng} className="flex items-center gap-1.5 rounded-lg bg-[#287d67] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#1e6b58] transition">
-            <Download className="size-3.5" /> Export
+          <button onClick={exportPng} className="flex items-center gap-1.5 rounded-lg border border-[#dce8df] bg-white px-3 py-1.5 text-xs font-bold text-[#1e6b58] shadow-sm hover:bg-[#e7f2eb] transition">
+            <Download className="size-3.5" /> PNG
+          </button>
+          <button onClick={exportPdf} className="flex items-center gap-1.5 rounded-lg bg-[#287d67] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#1e6b58] transition">
+            <Download className="size-3.5" /> PDF
           </button>
         </div>
       </div>

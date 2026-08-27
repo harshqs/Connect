@@ -24,6 +24,7 @@ import { ResearchPanel } from "@/components/research/ResearchPanel";
 import { CollaborativeCodeEditor } from "@/components/code/CollaborativeCodeEditor";
 import { VoiceHuddle } from "@/components/collaboration/VoiceHuddle";
 import { LiveReactions } from "@/components/collaboration/LiveReactions";
+import { MusicLounge } from "@/components/collaboration/MusicLounge";
 import {
   DocumentItem, fetchDocumentById, fetchCurrentUser,
   updateDocument, Comment, DocumentVersion,
@@ -193,6 +194,7 @@ export default function DocumentEditorPage({ params }: { params: Promise<{ id: s
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
+          <MusicLounge documentId={docId} currentUser={currentUser} />
           <VoiceHuddle documentId={docId} currentUser={currentUser} />
           <LiveReactions documentId={docId} currentUser={currentUser} />
 
