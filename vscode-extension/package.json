@@ -48,8 +48,18 @@
         "category": "Connect"
       },
       {
+        "command": "connect.sessionMenu",
+        "title": "Connect: Manage Session (Menu)",
+        "category": "Connect"
+      },
+      {
+        "command": "connect.restartSession",
+        "title": "Connect: Restart Fresh Session",
+        "category": "Connect"
+      },
+      {
         "command": "connect.stopSession",
-        "title": "Connect: Disconnect Session",
+        "title": "Connect: Stop Collaboration Session",
         "category": "Connect"
       }
     ],

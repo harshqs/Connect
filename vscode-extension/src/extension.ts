@@ -71,20 +71,80 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // ─── 4. Command: Disconnect Session ───────────────────────────────────────────
+  // ─── 4. Command: Disconnect / Stop Session ───────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand("connect.stopSession", () => {
       if (activeSession) {
         activeSession.provider.destroy();
         activeSession.ydoc.destroy();
-        activeSession.statusBarItem.hide();
+        activeSession.statusBarItem.text = `$(broadcast) Connect: Disconnected`;
+        activeSession.statusBarItem.tooltip = "Click to start collaboration session";
         activeSession = null;
-        vscode.window.showInformationMessage("Disconnected from Connect session.");
+        vscode.window.showInformationMessage("Disconnected from Connect live session.");
       }
     })
   );
 
-  // ─── 5. Command: Switch / Open Synced File ───────────────────────────────────
+  // ─── 5. Command: Restart Fresh Session ────────────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand("connect.restartSession", async () => {
+      if (activeSession) {
+        activeSession.provider.destroy();
+        activeSession.ydoc.destroy();
+        activeSession = null;
+      }
+      vscode.commands.executeCommand("connect.startSession");
+    })
+  );
+
+  // ─── 6. Command: Session Quick Menu ───────────────────────────────────────────
+  context.subscriptions.push(
+    vscode.commands.registerCommand("connect.sessionMenu", async () => {
+      if (!activeSession) {
+        const choice = await vscode.window.showQuickPick(
+          [
+            { label: "$(broadcast) Start Live Collaboration Session", action: "start" },
+          ],
+          { placeHolder: "Connect Live Collaboration" }
+        );
+        if (choice?.action === "start") {
+          vscode.commands.executeCommand("connect.startSession");
+        }
+        return;
+      }
+
+      const codeMap = activeSession.ydoc.getMap<string>("code-files");
+      const files: string[] = [];
+      codeMap.forEach((_, k) => files.push(k));
+
+      const items: Array<{ label: string; description?: string; action: string; file?: string }> = [
+        { label: `$(radio-tower) Connected: Room #${activeSession.roomId.slice(0, 8)}`, description: "Click to copy link", action: "copy" },
+        { label: "$(preview) Open Live Canvas & Notes Preview", action: "webview" },
+        { label: "$(file-submodule) Switch / Open Shared File...", description: `${files.length} file(s)`, action: "switchFile" },
+        { label: "$(sync) Restart Fresh Session", action: "restart" },
+        { label: "$(debug-stop) Stop Collaboration Session", action: "stop" },
+      ];
+
+      const chosen = await vscode.window.showQuickPick(items, {
+        placeHolder: `Connect Session (#${activeSession.roomId.slice(0, 6)})`,
+      });
+
+      if (chosen?.action === "copy") {
+        vscode.env.clipboard.writeText(`https://connect-seven-ecru.vercel.app/doc/${activeSession.roomId}`);
+        vscode.window.showInformationMessage("Copied room link to clipboard!");
+      } else if (chosen?.action === "webview") {
+        openLiveWebview(context, activeSession.roomId);
+      } else if (chosen?.action === "switchFile") {
+        vscode.commands.executeCommand("connect.showFiles");
+      } else if (chosen?.action === "restart") {
+        vscode.commands.executeCommand("connect.restartSession");
+      } else if (chosen?.action === "stop") {
+        vscode.commands.executeCommand("connect.stopSession");
+      }
+    })
+  );
+
+  // ─── 7. Command: Switch / Open Synced File ───────────────────────────────────
   context.subscriptions.push(
     vscode.commands.registerCommand("connect.showFiles", async () => {
       if (!activeSession) {
@@ -103,14 +163,12 @@ export function activate(context: vscode.ExtensionContext) {
       });
       if (selected) {
         const content = codeMap.get(selected) || "";
-        const lang = selected.endsWith(".html") ? "html" : selected.endsWith(".css") ? "css" : selected.endsWith(".js") || selected.endsWith(".ts") || selected.endsWith(".tsx") ? "javascript" : "plaintext";
-        const doc = await vscode.workspace.openTextDocument({ content, language: lang });
-        await vscode.window.showTextDocument(doc, { preview: false });
+        await openOrWriteFile(selected, content);
       }
     })
   );
 
-  // ─── 6. Sidebar Webview Provider ──────────────────────────────────────────────
+  // ─── 8. Sidebar Webview Provider ──────────────────────────────────────────────
   const sidebarProvider = new ConnectSidebarViewProvider(context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider("connect.liveCanvasView", sidebarProvider)
@@ -170,7 +228,26 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-let isApplyingRemote = false;
+async function openOrWriteFile(fileName: string, content: string) {
+  isApplyingRemote = true;
+  try {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (workspaceFolder && !fileName.startsWith("Untitled")) {
+      const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, fileName);
+      await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content, "utf-8"));
+      const doc = await vscode.workspace.openTextDocument(fileUri);
+      await vscode.window.showTextDocument(doc, { preview: false });
+    } else {
+      const lang = fileName.endsWith(".html") ? "html" : fileName.endsWith(".css") ? "css" : fileName.endsWith(".js") || fileName.endsWith(".ts") || fileName.endsWith(".tsx") ? "javascript" : "plaintext";
+      const doc = await vscode.workspace.openTextDocument({ content, language: lang });
+      await vscode.window.showTextDocument(doc, { preview: false });
+    }
+  } catch (err) {
+    console.error("Error opening/writing file:", err);
+  } finally {
+    isApplyingRemote = false;
+  }
+}
 
 function startLiveSession(
   context: vscode.ExtensionContext,
@@ -196,7 +273,8 @@ function startLiveSession(
   });
 
   statusBarItem.text = `$(broadcast) Connect: #${roomId.slice(0, 6)} (Live)`;
-  statusBarItem.tooltip = `Connected to Connect Room: ${roomId}\nClick to view Live Canvas/Doc`;
+  statusBarItem.tooltip = `Connected to Connect Room: ${roomId}\nClick to manage collaboration session`;
+  statusBarItem.command = "connect.sessionMenu";
   statusBarItem.show();
 
   activeSession = {
@@ -233,7 +311,7 @@ function startLiveSession(
         const edName = ed.document.isUntitled
           ? (ed.document.fileName.split(/[/\\]/).pop() || "Untitled-1")
           : vscode.workspace.asRelativePath(ed.document.uri);
-        return edName === fileName || (ed.document.isUntitled && editors.length === 1);
+        return edName === fileName;
       });
 
       if (matchedEditor) {
@@ -248,13 +326,30 @@ function startLiveSession(
           });
           isApplyingRemote = false;
         }
-      } else if (vscode.window.visibleTextEditors.length === 0 || vscode.window.activeTextEditor?.document.getText().trim() === "") {
-        // Automatically open the remote file in editor!
-        isApplyingRemote = true;
-        const lang = fileName.endsWith(".html") ? "html" : fileName.endsWith(".css") ? "css" : fileName.endsWith(".js") || fileName.endsWith(".ts") || fileName.endsWith(".tsx") ? "javascript" : "plaintext";
-        const doc = await vscode.workspace.openTextDocument({ content: newContent, language: lang });
-        await vscode.window.showTextDocument(doc, { preview: false });
-        isApplyingRemote = false;
+      } else {
+        // Automatically write to workspace folder on disk so file appears in Explorer
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (workspaceFolder && !fileName.startsWith("Untitled")) {
+          try {
+            const fileUri = vscode.Uri.joinPath(workspaceFolder.uri, fileName);
+            await vscode.workspace.fs.writeFile(fileUri, Buffer.from(newContent, "utf-8"));
+          } catch (e) {
+            console.error("Auto-disk write error:", e);
+          }
+        }
+
+        // Prompt or auto-open
+        if (vscode.window.visibleTextEditors.length === 0 || vscode.window.activeTextEditor?.document.getText().trim() === "") {
+          await openOrWriteFile(fileName, newContent);
+        } else {
+          vscode.window
+            .showInformationMessage(`📄 Collaborator created ${fileName}`, `Open ${fileName}`)
+            .then(async (action) => {
+              if (action === `Open ${fileName}`) {
+                await openOrWriteFile(fileName, newContent);
+              }
+            });
+        }
       }
     });
   });
