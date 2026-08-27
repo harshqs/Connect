@@ -56,7 +56,7 @@ export function VoiceHuddle({ documentId, currentUser, onSpeakingChange }: Voice
           analyserRef.current.getByteFrequencyData(dataArray);
           const sum = dataArray.reduce((a, b) => a + b, 0);
           const avg = sum / dataArray.length;
-          const speaking = avg > 25 && !isMuted;
+          const speaking = avg > 5 && !isMuted;
           setIsSpeaking(speaking);
           onSpeakingChange?.(speaking);
 
@@ -84,13 +84,20 @@ export function VoiceHuddle({ documentId, currentUser, onSpeakingChange }: Voice
   return (
     <div className="flex items-center gap-2">
       {isInHuddle ? (
-        <div className="flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-1 pl-3 text-xs shadow-lg backdrop-blur-md">
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/40 p-1 pl-3 text-xs shadow-lg backdrop-blur-md">
           <div className="flex items-center gap-2 mr-1">
             <span className="relative flex size-2.5">
               <span className={`absolute inline-flex h-full w-full rounded-full ${isSpeaking ? "bg-emerald-400 animate-ping" : "bg-emerald-500"}`} />
               <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500" />
             </span>
             <span className="font-bold text-emerald-300">Voice Huddle</span>
+
+            {/* Live Audio Equalizer Wave Animation */}
+            <div className="flex items-end gap-0.5 h-3.5 px-1">
+              <span className={`w-0.5 rounded-full bg-emerald-400 transition-all duration-75 ${isSpeaking ? "h-3.5 animate-pulse" : "h-1"}`} />
+              <span className={`w-0.5 rounded-full bg-emerald-400 transition-all duration-75 ${isSpeaking ? "h-2.5 animate-pulse delay-75" : "h-1.5"}`} />
+              <span className={`w-0.5 rounded-full bg-emerald-400 transition-all duration-75 ${isSpeaking ? "h-4 animate-pulse delay-150" : "h-1"}`} />
+            </div>
           </div>
 
           <button

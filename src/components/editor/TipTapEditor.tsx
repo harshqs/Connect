@@ -150,7 +150,10 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
     const editor = useEditor({
       editable: !readOnly,
       extensions: [
-        StarterKit.configure({}),
+        StarterKit.configure({
+          link: false,
+          underline: false,
+        }),
         Placeholder.configure({
           placeholder: "Type your notes here... Changes sync instantly across all online collaborators!",
         }),
